@@ -1,0 +1,36 @@
+[tools]
+"pipx:mpremote" = "1.29.0"
+
+[env]
+# USB serial number of this Pico 2 W (`mpremote connect list`, 2nd column). Connecting by
+# serial is stable across USB ports and never picks up other usbmodem devices.
+PICO = "id:2f46a57efadbd63a"
+
+[tasks.mp]
+description = "mpremote connected to the Pico; pass any mpremote args"
+run = "mpremote connect $PICO"
+
+[tasks.deploy]
+description = "Copy src/ to the Pico and soft-reset so main.py runs"
+run = "mpremote connect $PICO fs cp -r src/. : + soft-reset"
+
+[tasks.try]
+description = "Run a file on the Pico without writing it to flash"
+usage = 'arg "[file]" default="src/main.py"'
+run = 'mpremote connect $PICO run "${usage_file}"'
+
+[tasks.repl]
+description = "Interactive REPL (Ctrl-] to exit)"
+run = "mpremote connect $PICO repl"
+
+[tasks.ls]
+description = "List files on the Pico"
+run = "mpremote connect $PICO fs ls -r :"
+
+[tasks.reset]
+description = "Hard-reset the Pico"
+run = "mpremote connect $PICO reset"
+
+[tasks.wipe]
+description = "Delete every file on the Pico (firmware untouched)"
+run = "mpremote connect $PICO fs rm -r :/ || true"
