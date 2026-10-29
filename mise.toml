@@ -15,9 +15,9 @@ description = "Copy src/ to the Pico and soft-reset so main.py runs"
 run = "mpremote connect $PICO fs cp -r src/. : + soft-reset"
 
 [tasks.try]
-description = "Run a file on the Pico without writing it to flash"
+description = "Run a file on the Pico without writing it to flash; imports come from local src/"
 usage = 'arg "[file]" default="src/main.py"'
-run = 'mpremote connect $PICO run "${usage_file}"'
+run = 'mpremote connect $PICO mount src run "${usage_file}"'
 
 [tasks.repl]
 description = "Interactive REPL (Ctrl-] to exit)"

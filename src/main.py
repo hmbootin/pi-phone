@@ -1,11 +1,16 @@
-# Runs automatically on boot. Placeholder until phone hardware is wired up.
+# Runs automatically on boot. Prints each input change and lights the LED while any is pressed.
 import time
 from machine import Pin
 
-led = Pin("LED", Pin.OUT)
+from inputs import Inputs
+from pinmap import PINS
 
-for _ in range(3):
-    led.toggle()
-    time.sleep(0.2)
-led.off()
-print("pi-phone: booted")
+led = Pin("LED", Pin.OUT)
+inputs = Inputs(PINS)
+print("pi-phone: listening on", PINS)
+
+while True:
+    for name, pressed in inputs.events():
+        print(name, "down" if pressed else "up")
+    led.value(inputs.any_pressed())
+    time.sleep_ms(5)

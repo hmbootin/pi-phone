@@ -8,7 +8,7 @@ MicroPython app for a Raspberry Pi Pico 2 W that turns an old landline phone int
 
 ## Commands
 
-- `mise run try [file]` runs a file on the board without saving it (default `src/main.py`). Use this to iterate.
+- `mise run try [file]` runs a file on the board without saving it (default `src/main.py`). `src/` is mounted, so imports use your local modules. Use this to iterate.
 - `mise run deploy` copies `src/` to the board and restarts it.
 - `mise run mp <mpremote args>` for anything else, e.g. `mise run mp exec "print(1)"`.
 - Don't run `mise run repl` (needs a TTY) or bare `mpremote` (connects to the wrong device).

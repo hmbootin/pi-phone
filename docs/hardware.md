@@ -33,4 +33,17 @@ won't mount it. `picotool` writes over USB without mounting it.
 
 ## Wiring
 
-Not wired yet.
+Each input is a switch between a GPIO and GND, using the internal pull-up (active low).
+`src/pinmap.py` is the source of truth for which GPIO each input uses. Avoid GP23–25 and GP29:
+the Pico W uses them for the wireless chip.
+
+Breadboard test: push buttons stand in for phone keys. Put a button across the center channel,
+one leg to the GPIO and the diagonal leg to a GND pin (physical pins 3, 8, 13, 18, 23, 28, 33, 38).
+No resistor needed.
+
+| Input | GPIO | Physical pin |
+|-------|------|--------------|
+| 1–4   | GP2–GP5 | 4–7 |
+| 5–8   | GP6–GP9 | 9–12 |
+| 9, 0  | GP10, GP11 | 14, 15 |
+| hook  | GP15 | 20 |
