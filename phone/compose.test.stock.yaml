@@ -1,0 +1,22 @@
+# Override for phone/compose.test.yaml: a stock Asterisk 20 image instead of the repo's
+# asterisk/Dockerfile build, with the [phone] endpoint from asterisk/etc/pjsip.conf.tmpl copied
+# into a minimal pjsip.conf. Proves baresip registers against chan_pjsip with the exact endpoint
+# definition Tin Can uses, without waiting 30+ minutes for a source build.
+#
+#   phone/test-register.sh --stock
+#
+# The stock image has no entrypoint templating, so the password is fixed in
+# test/asterisk-stock/pjsip.conf; the phone side gets the same value below.
+
+services:
+  asterisk:
+    image: ${ASTERISK_IMAGE:-andrius/asterisk:20}
+    environment:
+      PHONE_SIP_PASSWORD: phone-test-password
+    volumes:
+      - ./test/asterisk-stock/pjsip.conf:/etc/asterisk/pjsip.conf:ro
+      - ./test/asterisk-stock/extensions.conf:/etc/asterisk/extensions.conf:ro
+
+  phone:
+    environment:
+      PHONE_SIP_PASSWORD: phone-test-password

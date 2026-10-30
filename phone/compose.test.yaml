@@ -1,0 +1,51 @@
+# Laptop test rig for the phone service: Asterisk + baresip on one compose bridge network, no
+# sound card, no host networking (Docker Desktop on macOS has no real host networking, so the
+# production compose.yaml cannot be used here). Run it through phone/test-register.sh.
+#
+#   docker compose -f phone/compose.test.yaml up --build -d
+#   docker compose -f phone/compose.test.yaml exec asterisk asterisk -rx "pjsip show endpoints"
+#   phone/ctl.sh reginfo          # ctrl_tcp is published on 127.0.0.1:4444
+#   docker compose -f phone/compose.test.yaml down -v
+#
+# ASTERISK_IMAGE defaults to the repo image built with `docker build -t tincan-asterisk:phone-test asterisk`.
+# phone/compose.test.stock.yaml swaps in a stock Asterisk 20 image with a minimal pjsip.conf for
+# when that build is unavailable.
+
+name: tincan-phone-test
+
+services:
+  asterisk:
+    image: ${ASTERISK_IMAGE:-tincan-asterisk:phone-test}
+    environment:
+      ARI_USER: test
+      ARI_PASSWORD: test
+      PHONE_SIP_PASSWORD: ${PHONE_SIP_PASSWORD:-phone-test-password}
+      TRUNK_PROVIDER: none
+    healthcheck:
+      test: ["CMD-SHELL", "asterisk -rx 'core show uptime' >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      start_period: 20s
+      retries: 10
+
+  phone:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tincan-phone:test
+    depends_on:
+      asterisk:
+        condition: service_healthy
+    environment:
+      PHONE_SIP_PASSWORD: ${PHONE_SIP_PASSWORD:-phone-test-password}
+      # Compose DNS name of the Asterisk container; on the Pi this is 127.0.0.1.
+      ASTERISK_HOST: asterisk
+      # No /dev/snd here: a sine generator stands in for the USB adapter.
+      PHONE_AUDIO_MODULE: ausine
+      PHONE_AUDIO_DEVICE: "440"
+      # ausine only runs at 48 kHz; baresip resamples to the 8 kHz codec.
+      PHONE_AUDIO_SRATE: "48000"
+      PHONE_CTRL_BIND: 0.0.0.0
+      PHONE_CTRL_PORT: "4444"
+    ports:
+      - "127.0.0.1:4444:4444"
