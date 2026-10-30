@@ -1,0 +1,95 @@
+#
+# baresip config for the Tin Can phone service. Rendered by entrypoint.sh with envsubst over a
+# FIXED variable list (PHONE_AUDIO_MODULE, PHONE_AUDIO_DEVICE, PHONE_AUDIO_SRATE, PHONE_CTRL_BIND,
+# PHONE_CTRL_PORT, PHONE_SIP_LISTEN). Anything else here is static. Keys follow baresip 1.1.0 (Debian trixie).
+#
+
+# Core
+poll_method		epoll
+
+# SIP. Host networking: Asterisk owns 5060 on the same Pi, so we take 5062 on every interface
+# (baresip must send to Asterisk from the Pi's real address, and the LAN test rig needs to reach
+# it from another container). Nothing on the LAN should talk to it; Asterisk only accepts
+# registrations with the shared password.
+sip_listen		${PHONE_SIP_LISTEN}
+sip_verify_server	no
+
+# Call. One line: the toddler has one handset. A second INVITE gets 486 Busy, which matches
+# device_state_busy_at = 1 on the Asterisk side.
+call_local_timeout	120
+call_max_calls		1
+call_hold_other_calls	no
+
+# Audio: the USB adapter on the Pi (alsa,plughw:1,0). Telephone band: mono, and the device
+# rate PHONE_AUDIO_SRATE (default 8000, so plughw does any resampling the adapter needs; the
+# codec side is always 8 kHz G.711 and baresip resamples if the two differ). For a laptop with
+# no sound card set PHONE_AUDIO_MODULE=ausine, which only runs at 48000 (README.md "Laptop test").
+audio_player		${PHONE_AUDIO_MODULE},${PHONE_AUDIO_DEVICE}
+audio_source		${PHONE_AUDIO_MODULE},${PHONE_AUDIO_DEVICE}
+audio_alert		${PHONE_AUDIO_MODULE},${PHONE_AUDIO_DEVICE}
+audio_path		/usr/share/baresip
+ausrc_srate		${PHONE_AUDIO_SRATE}
+auplay_srate		${PHONE_AUDIO_SRATE}
+ausrc_channels		1
+auplay_channels		1
+audio_level		no
+ausrc_format		s16
+auplay_format		s16
+auenc_format		s16
+audec_format		s16
+audio_buffer		20-160
+
+# No video, ever.
+video_size		320x240
+video_bitrate		0
+video_fps		1.00
+video_fullscreen	no
+
+# AVT. Loopback to Asterisk on the Pi; a small fixed jitter buffer keeps latency down.
+rtp_tos			184
+rtp_ports		20000-20100
+rtcp_mux		no
+jitter_buffer_type	fixed
+jitter_buffer_delay	5-10
+rtp_stats		no
+rtp_timeout		60
+
+#------------------------------------------------------------------------------
+# Modules (Debian path)
+
+module_path		/usr/lib/baresip/modules
+
+# Audio codec: G.711 only. pjsip.conf allows ulaw and alaw for the "phone" endpoint and nothing
+# else; the account line below pins the same order.
+module			g711.so
+
+# Audio driver. One module for player, source and alert (see audio_* above).
+module			${PHONE_AUDIO_MODULE}.so
+
+# Temporary modules: account.so reads the accounts file at start, uuid.so makes the instance id.
+module_tmp		uuid.so
+module_tmp		account.so
+
+# Application modules.
+# menu.so is not a UI here: it is the module that registers the dial/accept/hangup/listcalls/
+# reginfo commands that ctrl_tcp relays. Its ring/ringback files play through audio_player
+# (the earpiece), which is harmless on-hook and useful off-hook. Answer mode stays "manual"
+# (accounts file), so nothing is answered until the backend says so.
+module_app		menu.so
+module_app		ctrl_tcp.so
+
+#------------------------------------------------------------------------------
+# Module parameters
+
+# ctrl_tcp: netstring-framed JSON, one client at a time. Bound to PHONE_CTRL_BIND (default
+# 0.0.0.0, because the backend reaches it from Docker's bridge network through
+# host.docker.internal). With host networking that means every LAN host can reach it and there
+# is no authentication; the compose file comments explain the trade-off.
+ctrl_tcp_listen		${PHONE_CTRL_BIND}:${PHONE_CTRL_PORT}
+
+# Menu: no redial, keep ringback (the toddler hears ringing in the earpiece while Asterisk
+# sets the call up). statmode off keeps the log quiet.
+redial_attempts		0
+ringback_disabled	no
+statmode_default	off
+menu_clean_number	no

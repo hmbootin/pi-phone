@@ -58,6 +58,21 @@ ast "rtp set debug on"            # when audio is one-way
 `phone` not `Avail`: the phone service is down or has the wrong password. `tc logs phone`. `trunk` `Unavailable`: wrong host/credentials, or the
 provider blocks the Pi's IP; `pjsip set logger on` shows the 401/403.
 
+## The phone service (baresip)
+
+`tc logs phone` is the first stop. A healthy start ends with `ctrl_tcp: TCP socket listening on
+0.0.0.0:4444` and `baresip is ready.`; a good registration logs `reg: sip:phone@127.0.0.1 ...
+200 OK` and `ast "pjsip show endpoints"` shows `phone` as `Avail`.
+
+| Symptom | Look at |
+|---------|---------|
+| `phone` is `Unavail`, baresip logs `401` or `403` | `PHONE_SIP_PASSWORD` differs between the asterisk and phone services: fix `.env`, `tc up -d asterisk phone` |
+| baresip logs `Register: Connection timed out` | Asterisk is not up on 5060, or `ASTERISK_HOST` is wrong (it must be `127.0.0.1` on the Pi) |
+| `alsa: could not open ... plughw:1,0` on the first call | `aplay -l` on the host; set `PHONE_AUDIO_DEVICE` in `.env` to the USB adapter's card, `tc up -d phone`. `tc exec phone aplay -l` must list the same card |
+| Call connects, one side silent | `tc exec phone alsamixer -c 1` capture/playback levels; `ast "rtp set debug on"` |
+| Backend says it cannot reach ctrl_tcp | `tc exec phone /usr/local/bin/healthcheck.sh`; from the host `nc -z 127.0.0.1 4444`. Do not leave a hand `nc` connected: ctrl_tcp keeps one client and drops the previous one |
+| Want to poke it by hand | `phone/ctl.sh reginfo`, `phone/ctl.sh dial sip:2@127.0.0.1`, `phone/ctl.sh hangup` (phone/README.md) |
+
 ## Backups
 
 `sudo /opt/tincan/backup.sh` runs one now; `journalctl -u tincan-backup -n 100` shows the last

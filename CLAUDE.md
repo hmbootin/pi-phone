@@ -8,6 +8,8 @@ Read `docs/architecture.md` first. Decisions live in `docs/adr/`; add an ADR bef
 - `backend/` Python 3.12, FastAPI, SQLite. Call control talks to Asterisk over ARI. `uv` manages deps.
 - `ui/` React + Vite + TypeScript parent app. `pnpm`. Talks to the backend over `docs/api.md`.
 - `asterisk/` config. The dialplan is intentionally dumb: every call enters the `tincan` Stasis app.
+- `phone/` the baresip container: USB handset audio <-> SIP endpoint `phone`. The backend drives it over
+  `ctrl_tcp`; the wire protocol is in `phone/README.md`.
 - `hardware/` the phone teardown, wiring, BOM. `deploy/` Docker Compose for the Pi, bootstrap, OTA, backup.
   `firmware/pico/` is the old Pico work, unused.
 
