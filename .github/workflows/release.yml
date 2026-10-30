@@ -1,8 +1,8 @@
 name: Release
 
 # Tag a release from your laptop with `mise run release -- v1.2.3`. This builds the UI, then
-# multi-arch (linux/arm64 for the Pi, linux/amd64 for laptops/CI) images for backend and
-# asterisk, pushes them to GHCR as :v1.2.3 and :stable, and publishes a GitHub release.
+# multi-arch (linux/arm64 for the Pi, linux/amd64 for laptops/CI) images for backend,
+# asterisk and phone, pushes them to GHCR as :v1.2.3 and :stable, and publishes a GitHub release.
 # The Pi's tincan-update.timer notices the new release within 10 minutes.
 #
 # Build time: the Asterisk image compiles from source. Under QEMU emulation on a hosted
@@ -23,7 +23,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  # Image names are ghcr.io/<owner>/tincan-{backend,asterisk}, matching deploy/compose.yaml.
+  # Image names are ghcr.io/<owner>/tincan-{backend,asterisk,phone}, matching deploy/compose.yaml.
   OWNER: ${{ github.repository_owner }}
 
 jobs:
@@ -65,6 +65,9 @@ jobs:
           - image: tincan-asterisk
             context: asterisk
             dockerfile: asterisk/Dockerfile
+          - image: tincan-phone
+            context: phone
+            dockerfile: phone/Dockerfile
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -124,6 +127,7 @@ jobs:
             echo '```'
             echo "ghcr.io/${OWNER}/tincan-backend:${GITHUB_REF_NAME}"
             echo "ghcr.io/${OWNER}/tincan-asterisk:${GITHUB_REF_NAME}"
+            echo "ghcr.io/${OWNER}/tincan-phone:${GITHUB_REF_NAME}"
             echo '```'
             echo
             echo "Pis on the \`stable\` channel pick this up within 10 minutes. Pin with"

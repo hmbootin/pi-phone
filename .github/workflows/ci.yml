@@ -67,8 +67,8 @@ jobs:
       - run: sudo apt-get update -q && sudo apt-get install -y -q gettext-base shellcheck hadolint
       - name: shellcheck + hadolint
         run: |
-          shellcheck -S warning asterisk/entrypoint.sh deploy/*.sh
-          hadolint asterisk/Dockerfile
+          shellcheck -S warning asterisk/entrypoint.sh deploy/*.sh phone/*.sh
+          hadolint asterisk/Dockerfile phone/Dockerfile
           test -f backend/Dockerfile && hadolint --ignore DL3008 backend/Dockerfile || true
       - name: every ${VAR} in a template is a documented one
         # The allowed list must match TEMPLATE_VARS in asterisk/entrypoint.sh and the
@@ -112,6 +112,28 @@ jobs:
             fi
             echo "ok: $f"
           done
+      - name: phone templates only reference entrypoint variables
+        # Same contract as above for phone/etc/*.tmpl vs TEMPLATE_VARS in phone/entrypoint.sh.
+        run: |
+          vars=$(sed -n "s/^TEMPLATE_VARS='\(.*\)'$/\1/p" phone/entrypoint.sh)
+          allowed=$(tr -d '$' <<<"$vars")
+          status=0
+          for f in phone/etc/*.tmpl; do
+            # shellcheck disable=SC2016  # the pattern is a literal ${...}
+            for v in $(grep -o '\${[A-Za-z_][A-Za-z0-9_]*}' "$f" | tr -d '${}' | sort -u); do
+              case " $allowed " in
+                *" $v "*) ;;
+                *) echo "::error file=$f::\${$v} is not in TEMPLATE_VARS of phone/entrypoint.sh"; status=1 ;;
+              esac
+            done
+            out=$(PHONE_SIP_PASSWORD=ci ASTERISK_HOST=127.0.0.1 PHONE_AUDIO_MODULE=alsa PHONE_AUDIO_DEVICE=plughw:1,0 \
+              PHONE_AUDIO_SRATE=8000 PHONE_CTRL_BIND=0.0.0.0 PHONE_CTRL_PORT=4444 PHONE_SIP_LISTEN=0.0.0.0:5062 envsubst "$vars" <"$f")
+            if echo "$out" | grep -qE '\$\{(ASTERISK_|PHONE_)'; then
+              echo "::error file=$f::unrendered variable after envsubst"; echo "$out"; status=1
+            fi
+            echo "ok: $f"
+          done
+          exit $status
       - name: exactly one trunk template per provider
         run: |
           for p in voipms twilio none; do
@@ -124,11 +146,54 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: for f in deploy/*.sh asterisk/entrypoint.sh; do bash -n "$f"; done
+      - run: for f in deploy/*.sh asterisk/entrypoint.sh phone/*.sh; do bash -n "$f"; done
       - run: docker compose --env-file deploy/.env.example -f deploy/compose.yaml config -q
       - run: docker compose --env-file deploy/.env.example -f deploy/compose.yaml -f deploy/compose.dev.yaml config -q
+      - run: docker compose -f phone/compose.test.yaml config -q
       - name: systemd unit syntax
         run: |
           for u in deploy/systemd/*; do
             systemd-analyze verify --man=no "$u" 2>&1 | grep -v "Command .* is not executable" | grep -v "Unit .* not found" | grep -iE "error|fail" && exit 1 || echo "ok: $u"
           done
+
+  phone-image:
+    name: phone image (baresip) builds
+    # The phone image is a distro package install (Debian trixie baresip-core), so a full
+    # linux/amd64 build takes about a minute. Build it on every PR, never push, and prove the
+    # modules the templates load actually exist in the package and that the container boots
+    # with the no-hardware audio module and brings up ctrl_tcp.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: phone
+          file: phone/Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: tincan-phone:ci
+          cache-from: type=gha,scope=phone
+          cache-to: type=gha,scope=phone,mode=max
+      - name: modules the config loads exist in the package
+        run: |
+          for m in ctrl_tcp alsa g711 account menu uuid ausine aufile auloop; do
+            if docker run --rm --entrypoint test tincan-phone:ci -f "/usr/lib/baresip/modules/$m.so"; then
+              echo "ok: $m.so"
+            else
+              echo "::error::$m.so missing from baresip-core"; exit 1
+            fi
+          done
+      - name: container boots with ausine and ctrl_tcp listens
+        run: |
+          docker run -d --name phone -e PHONE_SIP_PASSWORD=ci -e PHONE_AUDIO_MODULE=ausine \
+            -e PHONE_AUDIO_DEVICE=440 tincan-phone:ci
+          ok=0
+          for _ in $(seq 1 20); do
+            if docker exec phone /usr/local/bin/healthcheck.sh 2>/dev/null; then ok=1; break; fi
+            sleep 1
+          done
+          docker logs phone
+          docker rm -f phone >/dev/null
+          test "$ok" = 1 || { echo "::error::ctrl_tcp never came up"; exit 1; }

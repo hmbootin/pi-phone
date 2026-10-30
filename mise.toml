@@ -36,8 +36,8 @@ description = "ruff + ui lint + shellcheck/hadolint/actionlint where installed"
 run = [
   "cd backend && uv run ruff check . && uv run ruff format --check .",
   "cd ui && pnpm lint",
-  "command -v shellcheck >/dev/null && shellcheck -S warning deploy/*.sh asterisk/entrypoint.sh || echo 'shellcheck not installed, skipped'",
-  "command -v hadolint >/dev/null && hadolint asterisk/Dockerfile || echo 'hadolint not installed, skipped'",
+  "command -v shellcheck >/dev/null && shellcheck -S warning deploy/*.sh asterisk/entrypoint.sh phone/*.sh || echo 'shellcheck not installed, skipped'",
+  "command -v hadolint >/dev/null && hadolint asterisk/Dockerfile phone/Dockerfile || echo 'hadolint not installed, skipped'",
   "command -v actionlint >/dev/null && actionlint || echo 'actionlint not installed, skipped'",
 ]
 
