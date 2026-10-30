@@ -1,0 +1,11 @@
+[Unit]
+Description=Tin Can OTA update check
+After=docker.service network-online.target tincan.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/tincan
+ExecStart=/opt/tincan/update.sh
+# Don't let a hung registry call pile up timer runs.
+TimeoutStartSec=20min

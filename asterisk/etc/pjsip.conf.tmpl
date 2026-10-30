@@ -1,0 +1,59 @@
+; Rendered by the entrypoint with envsubst. Variables: PHONE_SIP_PASSWORD, EXTERNAL_IP (optional,
+; may be empty), LOCAL_NET (optional, e.g. 192.168.1.0/24). The trunk section is a separate file
+; selected by TRUNK_PROVIDER; see README.md.
+
+[global]
+type = global
+user_agent = TinCan
+endpoint_identifier_order = username,ip,anonymous
+
+[transport-udp]
+type = transport
+protocol = udp
+bind = 0.0.0.0:5060
+; NAT hints for the trunk. Leave EXTERNAL_IP empty on a LAN-only setup or when the provider
+; registration keeps the NAT mapping alive (the usual case).
+external_media_address = ${EXTERNAL_IP}
+external_signaling_address = ${EXTERNAL_IP}
+local_net = ${LOCAL_NET}
+
+; ---- the ATA (Grandstream HT801 or any FXS ATA) ------------------------------------------------
+; It registers to us as user "phone". Its dial plan should send single digits immediately
+; ({x} pattern, no inter-digit timeout) so a toddler's "2" becomes INVITE sip:2@<pi>.
+[phone]
+type = endpoint
+context = from-phone
+disallow = all
+allow = ulaw
+allow = alaw
+direct_media = no
+rtp_symmetric = yes
+force_rport = yes
+rewrite_contact = yes
+dtmf_mode = rfc4733
+auth = phone-auth
+aors = phone
+callerid = Tin Can <100>
+language = en
+send_pai = no
+trust_id_inbound = no
+device_state_busy_at = 1
+
+[phone-auth]
+type = auth
+auth_type = userpass
+username = phone
+password = ${PHONE_SIP_PASSWORD}
+
+[phone]
+type = aor
+max_contacts = 1
+remove_existing = yes
+qualify_frequency = 30
+; (qualify makes GET /ari/endpoints/PJSIP/phone report online/offline for the status page)
+
+; ---- the trunk ------------------------------------------------------------------------------
+; The entrypoint links/renders one of pjsip_trunk_voipms.conf.tmpl, pjsip_trunk_twilio.conf.tmpl
+; or pjsip_trunk_none.conf to pjsip_trunk.conf. Every variant defines an endpoint named "trunk"
+; (or none at all for "none"); the backend only ever dials PJSIP/<number>@trunk.
+#include pjsip_trunk.conf

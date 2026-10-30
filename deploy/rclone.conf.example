@@ -1,0 +1,34 @@
+# rclone config for the Tin Can backup sidecar. Copy to /opt/tincan/rclone.conf (mode 0600).
+#
+# Two remotes: "b2" is the raw Backblaze B2 bucket, "tincan-backup" wraps it with rclone's
+# crypt backend so file names and contents are encrypted before they leave the house (ADR 0006).
+# The backup job only ever talks to tincan-backup:.
+#
+# Setup:
+#   1. Create a B2 bucket (private), then an application key scoped to that bucket with
+#      read+write (listBuckets, listFiles, readFiles, writeFiles). No deleteFiles: the job
+#      never deletes, and a key that can't delete can't be abused to.
+#   2. Fill in account/key below.
+#   3. Generate the crypt passwords on the Pi and store them somewhere else too (a password
+#      manager). WITHOUT THEM THE BACKUP IS UNREADABLE:
+#        rclone obscure "$(openssl rand -base64 32)"   # -> password
+#        rclone obscure "$(openssl rand -base64 32)"   # -> password2
+#   4. Test:  docker compose -f /opt/tincan/compose.yaml run --rm backup rclone lsd tincan-backup:
+#
+# S3 instead of B2: replace the [b2] section with
+#   type = s3 / provider = AWS / access_key_id = ... / secret_access_key = ... / region = ...
+# and set remote = s3:bucket-name/tincan in [tincan-backup].
+
+[b2]
+type = b2
+account = 0000000000000000000000000
+key = K000000000000000000000000000000
+hard_delete = false
+
+[tincan-backup]
+type = crypt
+remote = b2:your-bucket-name/tincan
+filename_encryption = standard
+directory_name_encryption = true
+password = OBSCURED_PASSWORD_FROM_RCLONE_OBSCURE
+password2 = OBSCURED_SALT_FROM_RCLONE_OBSCURE

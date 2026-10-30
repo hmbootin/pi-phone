@@ -1,0 +1,53 @@
+; Twilio Elastic SIP Trunking. Variables: TRUNK_USERNAME / TRUNK_PASSWORD (a credential list on
+; the trunk's termination settings), TRUNK_HOST (your termination SIP URI host, e.g.
+; tincan.pstn.twilio.com), TRUNK_DID (your Twilio number, E.164 digits), EXTERNAL_IP.
+;
+; Twilio does not accept SIP REGISTER: inbound (origination) is sent to a public SIP URI, so
+; port 5060/udp and the RTP range must reach this container (router port forward or Tailscale
+; Funnel is not enough for UDP). Set the origination URI in the Twilio console to
+; sip:<EXTERNAL_IP>:5060. If you can't expose UDP, use VoIP.ms (registration based).
+; Twilio origination source IPs are matched by the "identify" section below.
+
+[trunk-auth]
+type = auth
+auth_type = userpass
+username = ${TRUNK_USERNAME}
+password = ${TRUNK_PASSWORD}
+
+[trunk]
+type = endpoint
+context = from-trunk
+disallow = all
+allow = ulaw
+outbound_auth = trunk-auth
+aors = trunk
+direct_media = no
+rtp_symmetric = yes
+force_rport = yes
+rewrite_contact = yes
+dtmf_mode = rfc4733
+from_user = +${TRUNK_DID}
+from_domain = ${TRUNK_HOST}
+send_pai = yes
+trust_id_inbound = yes
+language = en
+
+[trunk]
+type = aor
+contact = sip:${TRUNK_HOST}
+qualify_frequency = 60
+
+; Twilio's origination signaling ranges (https://www.twilio.com/docs/sip-trunking/ip-addresses).
+; Check that page after a Twilio announcement; these are the global ranges as of 2025.
+[trunk]
+type = identify
+endpoint = trunk
+match = 54.172.60.0/30
+match = 54.244.51.0/30
+match = 54.171.127.192/30
+match = 35.156.191.128/30
+match = 54.65.63.192/30
+match = 54.169.127.128/30
+match = 54.252.254.64/30
+match = 177.71.206.192/30
+match = ${TRUNK_HOST}

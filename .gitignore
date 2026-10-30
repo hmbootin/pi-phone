@@ -1,3 +1,19 @@
 .DS_Store
 __pycache__/
 *.uf2
+
+# secrets and local state
+.env
+.env.*
+!.env.example
+deploy/rclone.conf
+data/
+
+# build output and deps
+node_modules/
+dist/
+.venv/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+coverage/

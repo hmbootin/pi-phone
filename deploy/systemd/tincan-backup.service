@@ -1,0 +1,12 @@
+[Unit]
+Description=Tin Can nightly off-site backup (rclone copy)
+After=docker.service network-online.target tincan.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/tincan
+ExecStart=/opt/tincan/backup.sh
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=6h

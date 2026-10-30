@@ -1,0 +1,53 @@
+; VoIP.ms trunk. Variables: TRUNK_USERNAME (the VoIP.ms sub-account, e.g. 123456_tincan),
+; TRUNK_PASSWORD, TRUNK_HOST (your POP, e.g. chicago1.voip.ms), TRUNK_DID (your number, digits).
+; Inbound calls arrive over the registration, so nothing needs to be port-forwarded.
+; In the VoIP.ms portal: sub-account with "Routing: SIP/IAX", DTMF RFC2833, codec ulaw, and
+; point the DID at this sub-account.
+
+[trunk-reg]
+type = registration
+transport = transport-udp
+outbound_auth = trunk-auth
+server_uri = sip:${TRUNK_HOST}
+client_uri = sip:${TRUNK_USERNAME}@${TRUNK_HOST}
+contact_user = ${TRUNK_DID}
+retry_interval = 30
+forbidden_retry_interval = 300
+expiration = 300
+line = yes
+endpoint = trunk
+
+[trunk-auth]
+type = auth
+auth_type = userpass
+username = ${TRUNK_USERNAME}
+password = ${TRUNK_PASSWORD}
+
+[trunk]
+type = endpoint
+context = from-trunk
+disallow = all
+allow = ulaw
+allow = alaw
+outbound_auth = trunk-auth
+aors = trunk
+direct_media = no
+rtp_symmetric = yes
+force_rport = yes
+rewrite_contact = yes
+dtmf_mode = rfc4733
+from_user = ${TRUNK_USERNAME}
+from_domain = ${TRUNK_HOST}
+send_pai = yes
+trust_id_inbound = yes
+language = en
+
+[trunk]
+type = aor
+contact = sip:${TRUNK_HOST}
+qualify_frequency = 60
+
+[trunk]
+type = identify
+endpoint = trunk
+match = ${TRUNK_HOST}

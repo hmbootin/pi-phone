@@ -1,0 +1,23 @@
+# Override for iterating on the Pi without a release: `mise run deploy-dev` rsyncs the repo to
+# ${TINCAN_HOST}:/opt/tincan/src and runs
+#   docker compose -f deploy/compose.yaml -f deploy/compose.dev.yaml up --build -d
+# there. Images are built on the Pi itself (native arm64, no QEMU), tagged :dev, and
+# deploy/update.sh ignores them because TINCAN_VERSION in .env still names the released tag.
+# Run `mise run pi -- 'cd /opt/tincan && docker compose up -d'` to go back to the release.
+services:
+  asterisk:
+    image: tincan-asterisk:dev
+    build:
+      context: ../asterisk
+      dockerfile: Dockerfile
+    pull_policy: never
+
+  backend:
+    image: tincan-backend:dev
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    pull_policy: never
+    environment:
+      TINCAN_VERSION: dev
+      TINCAN_LOG_LEVEL: DEBUG

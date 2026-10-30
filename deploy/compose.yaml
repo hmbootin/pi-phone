@@ -1,0 +1,104 @@
+# Tin Can on the Pi. `docker compose` is run by deploy/systemd/tincan.service from /opt/tincan.
+# Images are built by .github/workflows/release.yml and pulled here; deploy/compose.dev.yaml is
+# the override that builds from a checked-out repo instead.
+#
+# Required .env (see .env.example): GHCR_OWNER, TINCAN_VERSION, ARI_*, PHONE_SIP_PASSWORD,
+# TRUNK_*, TINCAN_PARENT_PASSWORD, TINCAN_SECRET_KEY.
+
+name: tincan
+
+services:
+  asterisk:
+    image: ghcr.io/${GHCR_OWNER}/tincan-asterisk:${TINCAN_VERSION:-stable}
+    container_name: tincan-asterisk
+    # host networking, deliberately. SIP carries the Pi's IP and the RTP port inside its own
+    # payload (SDP), so NAT between the container and the LAN means the ATA sends audio to an
+    # address Asterisk is not listening on: one-way or no audio. Publishing 5060 plus 101 RTP
+    # ports with -p works but each mapped UDP port costs a userland proxy on Docker, and the
+    # trunk still sees the container's private address unless you also configure
+    # external_media_address. On a single-purpose Pi on a home LAN, host networking is the
+    # pragmatic, debuggable choice: `pjsip show endpoints` sees the real addresses.
+    # Consequence: Asterisk binds 5060/udp, 8088/tcp (ARI, loopback only per http.conf) and
+    # 10000-10100/udp on the host. Nothing else on the Pi should use them.
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      ARI_USER: ${ARI_USER}
+      ARI_PASSWORD: ${ARI_PASSWORD}
+      PHONE_SIP_PASSWORD: ${PHONE_SIP_PASSWORD}
+      TRUNK_PROVIDER: ${TRUNK_PROVIDER:-none}
+      TRUNK_HOST: ${TRUNK_HOST:-}
+      TRUNK_USERNAME: ${TRUNK_USERNAME:-}
+      TRUNK_PASSWORD: ${TRUNK_PASSWORD:-}
+      TRUNK_DID: ${TRUNK_DID:-}
+      EXTERNAL_IP: ${EXTERNAL_IP:-}
+      LOCAL_NET: ${LOCAL_NET:-}
+    volumes:
+      - ${TINCAN_DATA_DIR:-/data}:/data
+    healthcheck:
+      test: ["CMD-SHELL", "asterisk -rx 'core show uptime' >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  backend:
+    image: ghcr.io/${GHCR_OWNER}/tincan-backend:${TINCAN_VERSION:-stable}
+    container_name: tincan-backend
+    restart: unless-stopped
+    depends_on:
+      asterisk:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      TINCAN_DATA_DIR: /data
+      # asterisk runs on the host network, so from the backend's bridge network the ARI
+      # endpoint is the Docker host. `host.docker.internal` is mapped below via extra_hosts.
+      ARI_URL: http://host.docker.internal:8088
+      ARI_USER: ${ARI_USER}
+      ARI_PASSWORD: ${ARI_PASSWORD}
+      ARI_APP: tincan
+      TINCAN_PARENT_PASSWORD: ${TINCAN_PARENT_PASSWORD}
+      TINCAN_SECRET_KEY: ${TINCAN_SECRET_KEY}
+      TINCAN_UI_DIR: /app/ui
+      TINCAN_VERSION: ${TINCAN_VERSION:-stable}
+      TZ: ${TZ:-UTC}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ${TINCAN_DATA_DIR:-/data}:/data
+    # backend/Dockerfile declares its own HEALTHCHECK against GET /healthz; this just tightens
+    # the timing so systemd/compose notice a dead backend within a minute.
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)\""]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  # Off-site backup sidecar (ADR 0006). Has profile "backup" so `compose up` never starts it;
+  # deploy/backup.sh (run nightly by tincan-backup.timer) does
+  #   docker compose run --rm backup copy /data/recordings tincan-backup:recordings
+  # It only ever `rclone copy`s; never sync or move, so a bad config can't delete a memory.
+  backup:
+    image: rclone/rclone:1.68
+    profiles: ["backup"]
+    network_mode: host
+    environment:
+      RCLONE_CONFIG: /config/rclone/rclone.conf
+      # Pi-friendly defaults; B2 likes few large uploads.
+      RCLONE_TRANSFERS: "4"
+      RCLONE_BWLIMIT: ${RCLONE_BWLIMIT:-off}
+    volumes:
+      - ${TINCAN_DATA_DIR:-/data}:/data:ro
+      - ${TINCAN_RCLONE_CONF:-/opt/tincan/rclone.conf}:/config/rclone/rclone.conf:ro
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "3" }

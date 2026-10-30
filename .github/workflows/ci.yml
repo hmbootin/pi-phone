@@ -1,0 +1,134 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, tin-can-landline]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: backend (ruff + pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen --all-extras
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q
+
+  ui:
+    name: ui (lint + test + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: ui/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-dist
+          path: ui/dist
+          retention-days: 3
+
+  asterisk-config:
+    name: asterisk config sanity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -q && sudo apt-get install -y -q gettext-base shellcheck hadolint
+      - name: shellcheck + hadolint
+        run: |
+          shellcheck -S warning asterisk/entrypoint.sh deploy/*.sh
+          hadolint asterisk/Dockerfile
+          test -f backend/Dockerfile && hadolint --ignore DL3008 backend/Dockerfile || true
+      - name: every ${VAR} in a template is a documented one
+        # The allowed list must match TEMPLATE_VARS in asterisk/entrypoint.sh and the
+        # "Variables" section of asterisk/etc/README.md. Dialplan variables like ${EXTEN} live in
+        # plain .conf files, never in .tmpl, so a .tmpl must only reference env vars.
+        run: |
+          allowed='ARI_USER ARI_PASSWORD PHONE_SIP_PASSWORD EXTERNAL_IP LOCAL_NET TRUNK_PROVIDER TRUNK_HOST TRUNK_USERNAME TRUNK_PASSWORD TRUNK_DID'
+          entry=$(sed -n "s/^TEMPLATE_VARS='\(.*\)'$/\1/p" asterisk/entrypoint.sh | tr -d '$')
+          if [ "$(tr ' ' '\n' <<<"$allowed" | sort)" != "$(tr ' ' '\n' <<<"$entry" | sort)" ]; then
+            echo "::error::allowed list in ci.yml differs from TEMPLATE_VARS in entrypoint.sh"; exit 1
+          fi
+          status=0
+          for f in asterisk/etc/*.tmpl; do
+            [ -e "$f" ] || { echo "no templates found"; break; }
+            # shellcheck disable=SC2016  # the pattern is a literal ${...}
+            for v in $(grep -o '\${[A-Za-z_][A-Za-z0-9_]*}' "$f" | tr -d '${}' | sort -u); do
+              case " $allowed " in
+                *" $v "*) ;;
+                *) echo "::error file=$f::\${$v} is not a documented template variable"; status=1 ;;
+              esac
+            done
+          done
+          exit $status
+      - name: envsubst dry-run with the fixed variable list
+        env:
+          ARI_USER: ci
+          ARI_PASSWORD: ci
+          PHONE_SIP_PASSWORD: ci
+          TRUNK_HOST: trunk.example
+          TRUNK_USERNAME: ci
+          TRUNK_PASSWORD: ci
+          TRUNK_DID: "15555550100"
+        run: |
+          vars=$(sed -n "s/^TEMPLATE_VARS='\(.*\)'$/\1/p" asterisk/entrypoint.sh)
+          for f in asterisk/etc/*.tmpl; do
+            [ -e "$f" ] || break
+            out=$(envsubst "$vars" <"$f")
+            # Nothing we meant to substitute may survive rendering.
+            if echo "$out" | grep -qE '\$\{(ARI_|PHONE_SIP_|TRUNK_)'; then
+              echo "::error file=$f::unrendered variable after envsubst"; echo "$out"; exit 1
+            fi
+            echo "ok: $f"
+          done
+      - name: exactly one trunk template per provider
+        run: |
+          for p in voipms twilio none; do
+            test -f "asterisk/etc/pjsip_trunk_${p}.conf.tmpl" || echo "::warning::asterisk/etc/pjsip_trunk_${p}.conf.tmpl missing"
+          done
+          grep -q 'pjsip_trunk.conf' asterisk/etc/pjsip.conf* || echo "::warning::pjsip.conf does not include pjsip_trunk.conf"
+
+  compose:
+    name: compose + bash syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: for f in deploy/*.sh asterisk/entrypoint.sh; do bash -n "$f"; done
+      - run: docker compose --env-file deploy/.env.example -f deploy/compose.yaml config -q
+      - run: docker compose --env-file deploy/.env.example -f deploy/compose.yaml -f deploy/compose.dev.yaml config -q
+      - name: systemd unit syntax
+        run: |
+          for u in deploy/systemd/*; do
+            systemd-analyze verify --man=no "$u" 2>&1 | grep -v "Command .* is not executable" | grep -v "Unit .* not found" | grep -iE "error|fail" && exit 1 || echo "ok: $u"
+          done

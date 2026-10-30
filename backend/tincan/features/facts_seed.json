@@ -1,0 +1,30 @@
+{
+  "dinosaurs": [
+    "A Tyrannosaurus rex had teeth as long as bananas.",
+    "Some dinosaurs had feathers, just like birds.",
+    "The Stegosaurus had a brain about the size of a walnut.",
+    "Dinosaur eggs could be as big as a football.",
+    "Birds are the dinosaurs that are still alive today."
+  ],
+  "animals": [
+    "An elephant can't jump, but it can swim.",
+    "A group of flamingos is called a flamboyance.",
+    "Octopuses have three hearts.",
+    "Cows have best friends and get sad when they're apart.",
+    "A snail can sleep for three years."
+  ],
+  "space": [
+    "The sun is a star, and it's really, really big.",
+    "A day on Venus is longer than a year on Venus.",
+    "There are more stars in the sky than grains of sand on all the beaches.",
+    "Astronauts grow a little bit taller in space.",
+    "The moon is slowly drifting away from the Earth, about as fast as your fingernails grow."
+  ],
+  "ocean": [
+    "The blue whale is the biggest animal that has ever lived.",
+    "Sea otters hold hands when they sleep so they don't float away.",
+    "Starfish don't have brains.",
+    "Most of the ocean has never been explored by people.",
+    "Dolphins sleep with one eye open."
+  ]
+}

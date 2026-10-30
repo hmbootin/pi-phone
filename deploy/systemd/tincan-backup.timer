@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Tin Can backup nightly at 03:15 local time
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,36 +1,119 @@
+# Tin Can monorepo toolchain and tasks (ADR 0005). `mise install` once, then `mise run <task>`.
+# Per-package tooling (uv, pnpm, mpremote) lives underneath; firmware/pico has its own mise.toml.
+
 [tools]
-"pipx:mpremote" = "1.29.0"
+python = "3.12"
+uv = "latest"
+node = "22"
+pnpm = "latest"
 
 [env]
-# USB serial number of this Pico 2 W (`mpremote connect list`, 2nd column). Connecting by
-# serial is stable across USB ports and never picks up other usbmodem devices.
-PICO = "id:2f46a57efadbd63a"
+# Tailscale MagicDNS name of the Pi (bootstrap.sh sets --hostname tincan). Override per shell:
+#   TINCAN_PI_HOST=192.168.1.50 mise run logs
+# (Not TINCAN_HOST: the backend reads that as its bind address, see backend/tincan/config.py.)
+TINCAN_PI_HOST = "tincan"
+TINCAN_PI_USER = "pi"
+# Where `deploy-dev` rsyncs the repo to on the Pi.
+TINCAN_PI_SRC = "/opt/tincan/src"
 
-[tasks.mp]
-description = "mpremote connected to the Pico; pass any mpremote args"
-run = "mpremote connect $PICO"
+# ---------------------------------------------------------------- laptop
+[tasks.setup]
+description = "Install backend (uv) and ui (pnpm) dependencies"
+run = [
+  "cd backend && uv sync --all-extras",
+  "cd ui && pnpm install",
+]
 
-[tasks.deploy]
-description = "Copy src/ to the Pico and soft-reset so main.py runs"
-run = "mpremote connect $PICO fs cp -r src/. : + soft-reset"
+[tasks.test]
+description = "Backend pytest + ui tests"
+run = [
+  "cd backend && uv run pytest -q",
+  "cd ui && pnpm test",
+]
 
-[tasks.try]
-description = "Run a file on the Pico without writing it to flash; imports come from local src/"
-usage = 'arg "[file]" default="src/main.py"'
-run = 'mpremote connect $PICO mount src run "${usage_file}"'
+[tasks.lint]
+description = "ruff + ui lint + shellcheck/hadolint/actionlint where installed"
+run = [
+  "cd backend && uv run ruff check . && uv run ruff format --check .",
+  "cd ui && pnpm lint",
+  "command -v shellcheck >/dev/null && shellcheck -S warning deploy/*.sh asterisk/entrypoint.sh || echo 'shellcheck not installed, skipped'",
+  "command -v hadolint >/dev/null && hadolint asterisk/Dockerfile || echo 'hadolint not installed, skipped'",
+  "command -v actionlint >/dev/null && actionlint || echo 'actionlint not installed, skipped'",
+]
 
-[tasks.repl]
-description = "Interactive REPL (Ctrl-] to exit)"
-run = "mpremote connect $PICO repl"
+[tasks."dev:backend"]
+description = "Backend on :8080 against the in-process fake ARI"
+dir = "backend"
+env = { TINCAN_FAKE_ARI = "1", TINCAN_DATA_DIR = "{{config_root}}/data", TINCAN_UI_DIR = "{{config_root}}/ui/dist", TINCAN_PARENT_PASSWORD = "dev", TINCAN_SECRET_KEY = "dev-not-secret", ARI_USER = "dev", ARI_PASSWORD = "dev", ARI_APP = "tincan" }
+run = "mkdir -p {{config_root}}/data && uv run tincan"
 
-[tasks.ls]
-description = "List files on the Pico"
-run = "mpremote connect $PICO fs ls -r :"
+[tasks."dev:ui"]
+description = "Vite dev server on :5173, proxying /api to :8080"
+dir = "ui"
+run = "pnpm dev"
 
-[tasks.reset]
-description = "Hard-reset the Pico"
-run = "mpremote connect $PICO reset"
+[tasks.dev]
+description = "Backend (fake ARI, :8080) and ui (:5173) together; Ctrl-C stops both"
+run = """
+trap 'kill 0' INT TERM EXIT
+mise run dev:backend &
+mise run dev:ui &
+wait
+"""
 
-[tasks.wipe]
-description = "Delete every file on the Pico (firmware untouched)"
-run = "mpremote connect $PICO fs rm -r :/ || true"
+[tasks.build]
+description = "Build the ui, then the backend and asterisk images for this machine's arch"
+run = [
+  "cd ui && pnpm build",
+  "docker build -t tincan-backend:local -f backend/Dockerfile .",
+  "docker build -t tincan-asterisk:local asterisk",
+]
+
+[tasks.release]
+description = "Tag a release and push the tag; CI builds images and publishes it. Usage: mise run release -- v1.2.3"
+usage = 'arg "<version>" help="tag like v1.2.3"'
+run = """
+set -euo pipefail
+v="{{arg(name="version")}}"
+[[ "$v" =~ ^v[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "version must look like v1.2.3 (got $v)"; exit 1; }
+git diff --quiet && git diff --cached --quiet || { echo "working tree not clean"; exit 1; }
+git tag -a "$v" -m "Release $v"
+git push origin "$v"
+echo "pushed $v; watch: gh run watch || https://github.com/$(git remote get-url origin | sed -E 's#.*github.com[:/]##; s#\\.git$##')/actions"
+"""
+
+# ---------------------------------------------------------------- the Pi
+[tasks.pi]
+description = "Run a command on the Pi over Tailscale SSH. Usage: mise run pi -- docker ps"
+run = 'ssh -t "$TINCAN_PI_USER@$TINCAN_PI_HOST" -- "$@"'
+
+[tasks.logs]
+description = "Follow compose logs on the Pi (optionally one service: mise run logs -- backend)"
+run = 'ssh -t "$TINCAN_PI_USER@$TINCAN_PI_HOST" -- docker compose -f /opt/tincan/compose.yaml logs -f --tail 200 "$@"'
+
+[tasks.deploy-dev]
+description = "rsync the repo to the Pi and build+run it there (no release needed)"
+run = """
+set -euo pipefail
+cd ui && pnpm build && cd ..
+rsync -az --delete --info=stats1 \
+--exclude .git --exclude node_modules --exclude .venv --exclude __pycache__ --exclude data --exclude '.env' \
+./ "$TINCAN_PI_USER@$TINCAN_PI_HOST:$TINCAN_PI_SRC/"
+ssh -t "$TINCAN_PI_USER@$TINCAN_PI_HOST" -- \
+"cd $TINCAN_PI_SRC && docker compose --env-file /opt/tincan/.env -f deploy/compose.yaml -f deploy/compose.dev.yaml up --build -d --remove-orphans && docker compose --env-file /opt/tincan/.env -f deploy/compose.yaml ps"
+"""
+
+[tasks.deploy-release]
+description = "Put the Pi back on released images (undo deploy-dev)"
+run = 'ssh -t "$TINCAN_PI_USER@$TINCAN_PI_HOST" -- "cd /opt/tincan && docker compose -f compose.yaml up -d --remove-orphans"'
+
+# ---------------------------------------------------------------- firmware
+[tasks.pico]
+description = "Run a firmware/pico task. Usage: mise run pico -- deploy"
+dir = "firmware/pico"
+run = 'mise run "$@"'
+
+# ---------------------------------------------------------------- demo
+[tasks.demo]
+description = "No-hardware demo: backend + fake Asterisk + built UI, drives a scripted day of calls. Open :8080, password demo"
+run = "scripts/demo.sh"

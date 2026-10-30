@@ -1,0 +1,16 @@
+[Unit]
+Description=Tin Can toddler landline (Docker Compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/tincan
+ExecStart=/usr/bin/docker compose -f /opt/tincan/compose.yaml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose -f /opt/tincan/compose.yaml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
