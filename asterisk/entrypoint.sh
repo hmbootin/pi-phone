@@ -29,7 +29,7 @@ require() {
   fi
 }
 
-# Credentials the ATA and the backend use; Asterisk is useless without them.
+# Credentials the phone service and the backend use; Asterisk is useless without them.
 require ARI_USER
 require ARI_PASSWORD
 require PHONE_SIP_PASSWORD

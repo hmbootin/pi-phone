@@ -61,7 +61,7 @@ Asterisk's dialplan sends every call into the `tincan` Stasis app with args:
 
 | Who | Dialplan | StasisStart args | Backend does |
 |-----|----------|------------------|--------------|
-| ATA dials `2` | `from-phone` | `dial,2` | speed dial -> contact -> policy -> originate `PJSIP/+1555...@trunk` (or `PJSIP/sip:...` for `sip:` contacts) with `appArgs=far` |
+| Phone dials `2` | `from-phone` | `dial,2` | speed dial -> contact -> policy -> originate `PJSIP/+1555...@trunk` (or `PJSIP/sip:...` for `sip:` contacts) with `appArgs=far` |
 | Trunk delivers a call | `from-trunk` | `inbound` | caller ID -> contact -> policy -> originate `PJSIP/phone` with `appArgs=ring` |
 | Backend test call | n/a | `test` | `POST /api/system/test-call` |
 

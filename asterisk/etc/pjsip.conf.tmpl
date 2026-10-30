@@ -17,9 +17,9 @@ external_media_address = ${EXTERNAL_IP}
 external_signaling_address = ${EXTERNAL_IP}
 local_net = ${LOCAL_NET}
 
-; ---- the ATA (Grandstream HT801 or any FXS ATA) ------------------------------------------------
-; It registers to us as user "phone". Its dial plan should send single digits immediately
-; ({x} pattern, no inter-digit timeout) so a toddler's "2" becomes INVITE sip:2@<pi>.
+; ---- the phone: baresip in the "phone" Compose service, audio on the USB adapter -----------------
+; It registers to us as user "phone" from the Pi itself. The backend tells it what to dial, one
+; digit (or memory key) per call, so a toddler's "2" becomes INVITE sip:2@<pi>.
 [phone]
 type = endpoint
 context = from-phone

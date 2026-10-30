@@ -34,9 +34,10 @@ copied to `/opt/tincan` by `bootstrap.sh`; nothing else lives on the host.
    and secret keys were generated for you.
 4. Start it: `sudo systemctl start tincan`, then `docker compose -f /opt/tincan/compose.yaml logs -f`.
    The first pull is a few hundred MB.
-5. Point the ATA at the Pi: SIP server = the Pi's LAN IP, user `phone`, password =
-   `PHONE_SIP_PASSWORD`. See `hardware/` for the ATA settings. `pjsip show endpoints` inside the
-   Asterisk container should show `phone` as `Avail`.
+5. Plug in the phone hardware: the USB audio adapter (handset), the GPIO bundle (keys and hook)
+   and the ringer amp on the headphone jack, per `hardware/phone-interface.md`. The `phone`
+   service (baresip) registers automatically with `PHONE_SIP_PASSWORD`; `pjsip show endpoints`
+   inside the Asterisk container should show `phone` as `Avail`.
 6. Open `http://tincan:8080` (Tailscale) or `http://<pi-ip>:8080` (LAN) and log in with the
    parent password.
 

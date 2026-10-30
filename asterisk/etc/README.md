@@ -30,7 +30,7 @@ Delete the rendered `*.conf` only; never write secrets back into `asterisk/etc`.
 |-----|---------|----------|
 | `ARI_USER` | `ari.conf.tmpl` | yes (backend uses the same name) |
 | `ARI_PASSWORD` | `ari.conf.tmpl` | yes |
-| `PHONE_SIP_PASSWORD` | `pjsip.conf.tmpl` | yes; configure the same password on the ATA, user `phone` |
+| `PHONE_SIP_PASSWORD` | `pjsip.conf.tmpl` | yes; the `phone` service (baresip) registers with it as user `phone` |
 | `EXTERNAL_IP` | `pjsip.conf.tmpl` | optional; empty is fine on a LAN / registration-based trunk |
 | `LOCAL_NET` | `pjsip.conf.tmpl` | optional, e.g. `192.168.1.0/24`; empty is fine |
 | `TRUNK_PROVIDER` | entrypoint | `voipms`, `telnyx`, `twilio`, or `none` (default) |
@@ -51,7 +51,7 @@ values (`external_media_address =` with nothing after it is valid for PJSIP).
 | `http.conf` | HTTP on `0.0.0.0:8088` for ARI (Compose-internal only) |
 | `ari.conf.tmpl` | One ARI user |
 | `rtp.conf` | RTP ports 10000-10100 |
-| `pjsip.conf.tmpl` | UDP transport on 5060, the `phone` endpoint (ATA), `#include pjsip_trunk.conf` |
+| `pjsip.conf.tmpl` | UDP transport on 5060, the `phone` endpoint (baresip on the Pi), `#include pjsip_trunk.conf` |
 | `pjsip_trunk_voipms.conf.tmpl` | `trunk` endpoint + outbound registration to VoIP.ms (inbound rides the registration; no port forward) |
 | `pjsip_trunk_telnyx.conf.tmpl` | Same shape for Telnyx credentials connections (registration to `sip.telnyx.com`) |
 | `pjsip_trunk_twilio.conf.tmpl` | `trunk` endpoint for Twilio Elastic SIP Trunking (no REGISTER; needs 5060/udp + RTP reachable) |
@@ -61,13 +61,13 @@ values (`external_media_address =` with nothing after it is valid for PJSIP).
 
 ## Ports
 
-- `5060/udp` SIP (LAN for the ATA; internet only for Twilio)
+- `5060/udp` SIP (loopback for the phone service; internet only for Twilio)
 - `10000-10100/udp` RTP (same)
 - `8088/tcp` ARI, internal only; never publish it
 
 ## How the backend names things
 
-- ATA endpoint `PJSIP/phone`, trunk endpoint `PJSIP/trunk`; outbound calls are originated as
+- Phone endpoint `PJSIP/phone` (baresip), trunk endpoint `PJSIP/trunk`; outbound calls are originated as
   `PJSIP/<E.164>@trunk` (or `PJSIP/sip:user@host` for direct SIP contacts).
 - Stasis app `tincan` (`ARI_APP` in the backend). Args: `dial,<digits>`, `inbound`; the backend's
   own originates use `far`, `ring`, `test`.
@@ -75,9 +75,9 @@ values (`external_media_address =` with nothing after it is valid for PJSIP).
   `/data/asterisk/recording/<yyyy>/<mm>/call-<id>.wav`. The backend pre-creates the directories.
 - Prompts are played as `sound:/data/prompts/<sha>` (8 kHz s16 mono WAV).
 
-## ATA settings (Grandstream HT801)
+## Phone service (baresip) settings
 
-- SIP server: the Pi's LAN IP, port 5060; user/auth ID `phone`; password `PHONE_SIP_PASSWORD`.
-- Dial plan: `{x}` so each digit is sent immediately. Disable "dial tone timeout" or set it short.
-- Codec: PCMU (ulaw) first. DTMF: RFC2833. Disable "use random port".
+- SIP server: `127.0.0.1:5060` (same host); user/auth ID `phone`; password `PHONE_SIP_PASSWORD`.
+- Audio: ALSA on the USB adapter (`plughw:1,0`), ulaw only, 8 kHz. DTMF as RFC2833.
+- Auto-answer off; the backend answers when the hook switch lifts, via baresip's `ctrl_tcp`.
 - Check with `asterisk -rx "pjsip show endpoints"`: `phone` must show `Avail`.

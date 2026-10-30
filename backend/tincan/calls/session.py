@@ -1,6 +1,6 @@
 """One call, from StasisStart to the written call row.
 
-A session owns at most two channels: `phone` (the ATA leg) and `far` (trunk or feature-less).
+A session owns at most two channels: `phone` (the baresip leg) and `far` (trunk or feature-less).
 Flows are plain async functions that await ARI completion events through `wait_for`; a hangup
 on any channel in `self.ends_call` raises `CallEnded` out of whatever the flow was waiting on,
 and `run()` turns that into the right outcome and cleanup.
@@ -362,7 +362,7 @@ class CallSession:
         await self.bridged_phase()
 
     async def run_inbound(self) -> None:
-        """A contact is calling: ring the ATA, bridge on answer, record, cap."""
+        """A contact is calling: ring the phone, bridge on answer, record, cap."""
         assert self.far_channel and self.contact
         trunk = self.far_channel
         self.ends_call.add(trunk)
@@ -406,7 +406,7 @@ class CallSession:
         self.outcome = self.outcome or "completed"
 
     async def run_test_call(self) -> None:
-        """Ring the ATA and speak a test prompt when answered (POST /api/system/test-call)."""
+        """Ring the phone and speak a test prompt when answered (POST /api/system/test-call)."""
         phone = uuid.uuid4().hex
         self.phone_channel = phone
         up = self.register(lambda e: isinstance(e, StasisStart) and e.channel.id == phone)

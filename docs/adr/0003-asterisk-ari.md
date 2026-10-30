@@ -2,11 +2,11 @@
 
 Status: accepted. 2026-10-29.
 
-We need: SIP registration for the ATA and the trunk, RTP handling, bridging, recording both legs,
+We need: SIP registration for the phone service and the trunk, RTP handling, bridging, recording both legs,
 playing prompts, DTMF events, and reliable hangup. Asterisk 20 LTS does all of it, runs fine on a Pi
 4, and has twenty years of answers on the internet. FreeSWITCH is comparable but heavier and less
-documented for hobbyists. Writing our own SIP/RTP stack (e.g. with `pjsua2` or `baresip`) would make
-recording and bridging our problem.
+documented for hobbyists. Writing our own SIP/RTP stack would make recording and bridging our problem. (baresip is still
+used, but only as the dumb SIP phone on the handset side; see ADR 0002.)
 
 The dialplan is deliberately dumb. Both contexts (`from-phone`, `from-trunk`) hand off to
 `Stasis(tincan, ...)` immediately. The backend owns every decision through ARI (REST +

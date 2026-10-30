@@ -12,7 +12,7 @@ services:
     image: ghcr.io/${GHCR_OWNER}/tincan-asterisk:${TINCAN_VERSION:-stable}
     container_name: tincan-asterisk
     # host networking, deliberately. SIP carries the Pi's IP and the RTP port inside its own
-    # payload (SDP), so NAT between the container and the LAN means the ATA sends audio to an
+    # payload (SDP), so NAT between the container and the LAN means the trunk sends audio to an
     # address Asterisk is not listening on: one-way or no audio. Publishing 5060 plus 101 RTP
     # ports with -p works but each mapped UDP port costs a userland proxy on Docker, and the
     # trunk still sees the container's private address unless you also configure

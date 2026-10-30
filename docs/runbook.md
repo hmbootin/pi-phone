@@ -15,7 +15,7 @@ alias ast='tc exec asterisk asterisk -rx'
 ```
 systemctl status tincan tincan-update.timer tincan-backup.timer
 tc ps                       # asterisk healthy, backend healthy
-ast "pjsip show endpoints"  # phone: Avail once the ATA registers; trunk: Avail if configured
+ast "pjsip show endpoints"  # phone: Avail once the phone service registers; trunk: Avail if configured
 curl -s localhost:8080/api/system/status | jq
 ```
 
@@ -39,7 +39,7 @@ uses credentials. VoIP.ms: enable the sub-account, set it to "SIP", NAT = yes.
 | `TINCAN_PARENT_PASSWORD` | `.env` | `tc up -d backend` |
 | `TINCAN_SECRET_KEY` | `.env` | `tc up -d backend`; everyone is logged out |
 | `ARI_PASSWORD` | `.env` | `tc up -d` (both containers read it) |
-| `PHONE_SIP_PASSWORD` | `.env` **and** the ATA's web UI | `tc up -d asterisk`, then save on the ATA; phone re-registers in <1 min |
+| `PHONE_SIP_PASSWORD` | `.env` (asterisk and phone services) | `tc up -d asterisk phone`; phone re-registers in <1 min |
 | `TRUNK_PASSWORD` | provider portal first, then `.env` | `tc up -d asterisk` |
 | rclone crypt passwords | don't. Changing them makes every existing backup unreadable. Rotate the B2 application key instead. |
 
@@ -49,14 +49,13 @@ Generate with `openssl rand -hex 24`.
 
 ```
 ast "pjsip show endpoints"        # the overview
-ast "pjsip show contacts"         # where the ATA registered from and its RTT
+ast "pjsip show contacts"         # where the phone service registered from and its RTT
 ast "pjsip show registrations"    # our registration to the trunk
 ast "pjsip set logger on"         # SIP trace to the console; `tc logs -f asterisk`
 ast "rtp set debug on"            # when audio is one-way
 ```
 
-`phone` not `Avail`: the ATA is off, on another subnet, or has the wrong password. Check the
-ATA's status page for "Registered". `trunk` `Unavailable`: wrong host/credentials, or the
+`phone` not `Avail`: the phone service is down or has the wrong password. `tc logs phone`. `trunk` `Unavailable`: wrong host/credentials, or the
 provider blocks the Pi's IP; `pjsip set logger on` shows the 401/403.
 
 ## Backups
@@ -115,7 +114,7 @@ Rebuild is bootstrap + restore; nothing on the host is hand-configured.
 
 1. New SD/SSD, Raspberry Pi OS Lite 64-bit, same hostname `tincan`.
 2. `deploy/README.md` §1 steps 2–4 with the **old `.env`** (you kept a copy, or re-create: new
-   `ARI_PASSWORD`/`TINCAN_SECRET_KEY` are fine, but `PHONE_SIP_PASSWORD` must match the ATA and
+   `ARI_PASSWORD`/`TINCAN_SECRET_KEY` are fine, but `PHONE_SIP_PASSWORD` must match the phone service and
    `TRUNK_*` the provider).
 3. Put `rclone.conf` back, then **Restore from backup** above.
 4. In Tailscale's admin console delete the old `tincan` machine so MagicDNS points at the new one.
@@ -127,9 +126,11 @@ If the SD card is readable, `/data` and `/opt/tincan/.env` from it beat any back
 
 | Symptom | Look at |
 |---------|---------|
-| No dial tone | ATA power / registration: `ast "pjsip show endpoints"` |
+| Nothing in the earpiece | USB audio adapter: `aplay -l` on the host, then `tc logs phone`; registration: `ast "pjsip show endpoints"` |
+| Keys do nothing | `tc logs backend` for the key scanner; check the GPIO bundle and that the hook reads off-hook |
+| No ring | `aplay` a WAV to the Pi headphone jack on the host; check the amp's 5 V |
 | Dials, nothing happens | `tc logs backend`: is it connected to ARI? `curl -u $ARI_USER:$ARI_PASSWORD localhost:8088/ari/asterisk/info` |
-| One-way audio | `ast "rtp set debug on"`; the ATA and Pi must be on the same subnet; trunk needs `external_media_address` if the Pi is behind a double NAT |
+| One-way audio | `ast "rtp set debug on"`; check `alsamixer` capture gain on the USB adapter; trunk needs `external_media_address` if the Pi is behind a double NAT |
 | Rings but nobody answers / family can't call in | trunk registration; inbound DID routing on the provider side points at the SIP registration |
 | No recording in UI | `ls -la /data/asterisk/recording /data/recordings`, ownership 2000:tincan |
 | UI unreachable | `tc ps`; `curl localhost:8080/healthz`; Tailscale: `tailscale status` |
