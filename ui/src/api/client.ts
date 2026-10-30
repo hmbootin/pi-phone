@@ -11,6 +11,7 @@ import type {
   FeaturePreview,
   Recording,
   RecordingsQuery,
+  Ringtone,
   Settings,
   SettingsPatch,
   SystemStatus,
@@ -35,11 +36,13 @@ export const UNAUTHORIZED_EVENT = 'tincan:unauthorized';
 type Method = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
 async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
+  // FormData sets its own multipart boundary; everything else is JSON.
+  const form = body instanceof FormData;
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     credentials: 'same-origin',
-    headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    headers: body === undefined || form ? {} : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : form ? body : JSON.stringify(body),
   });
 
   if (!res.ok) {
@@ -103,6 +106,16 @@ export const api = {
     markListened: (id: number, listened = true) =>
       request<Recording>('PATCH', `/recordings/${id}`, { listened }),
     audioUrl: (id: number) => `${API_BASE}/recordings/${id}/audio`,
+  },
+  ringtones: {
+    list: () => request<Ringtone[]>('GET', '/ringtones'),
+    upload: (file: File) => {
+      const form = new FormData();
+      form.append('file', file, file.name);
+      return request<Ringtone>('POST', '/ringtones', form);
+    },
+    remove: (name: string) => request<void>('DELETE', `/ringtones/${encodeURIComponent(name)}`),
+    audioUrl: (name: string) => `${API_BASE}/ringtones/${encodeURIComponent(name)}/audio`,
   },
   system: {
     status: () => request<SystemStatus>('GET', '/system/status'),

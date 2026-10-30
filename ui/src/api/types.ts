@@ -79,9 +79,20 @@ export interface Settings {
   notifications: Notifications;
   trunk_caller_id: string;
   weather_location: WeatherLocation;
+  /** Name of a ringtone from GET /api/ringtones (built-in or uploaded). */
+  ringtone: string;
+  /** 0-100, applied to the base speaker. */
+  ringer_volume: number;
 }
 
 export type SettingsPatch = Partial<Settings>;
+
+export interface Ringtone {
+  name: string;
+  builtin: boolean;
+  duration_seconds: number;
+  audio_url: string;
+}
 
 export type CallDirection = 'outbound' | 'inbound' | 'feature';
 

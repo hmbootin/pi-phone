@@ -1,9 +1,10 @@
-import type { Call, Contact, Feature, Recording, Settings, SystemStatus } from '../api/types';
+import type { Call, Contact, Feature, Recording, Ringtone, Settings, SystemStatus } from '../api/types';
 
 export interface MockDb {
   contacts: Contact[];
   features: Feature[];
   settings: Settings;
+  ringtones: Ringtone[];
   calls: Call[];
   recordings: Recording[];
   status: SystemStatus;
@@ -86,7 +87,22 @@ export function seedDb(now = new Date()): MockDb {
     notifications: { ntfy_topic: 'tincan-home', email: null },
     trunk_caller_id: '+15555550100',
     weather_location: { lat: 30.27, lon: -97.74, name: 'home' },
+    ringtone: 'classic',
+    ringer_volume: 80,
   };
+
+  const ringtone = (name: string, builtin: boolean, duration_seconds = 2): Ringtone => ({
+    name,
+    builtin,
+    duration_seconds,
+    audio_url: `/api/ringtones/${name}/audio`,
+  });
+  const ringtones: Ringtone[] = [
+    ringtone('classic', true),
+    ringtone('chime', true),
+    ringtone('birds', true),
+    ringtone('grandmas-doorbell', false, 1.4),
+  ];
 
   const recordings: Recording[] = [];
   const calls: Call[] = [];
@@ -163,6 +179,7 @@ export function seedDb(now = new Date()): MockDb {
     contacts,
     features,
     settings,
+    ringtones,
     calls,
     recordings,
     status,
