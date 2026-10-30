@@ -578,3 +578,47 @@ audio {
   color: var(--muted);
   padding: 24px 0;
 }
+
+/* Ringtone picker (Settings) */
+.ringtones {
+  margin-bottom: 12px;
+}
+
+.ringtone-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.ringtone-pick input[type='radio'] {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.ringtone-name {
+  font-weight: 500;
+}
+
+.ringtone-actions {
+  margin-top: 6px;
+}
+
+.ringtone-actions audio {
+  flex: 1;
+  min-width: 0;
+}
+
+.field input[type='range'] {
+  width: 100%;
+  min-height: 44px;
+  accent-color: var(--accent);
+}
+
+.field input[type='file'] {
+  min-height: 44px;
+  padding: 8px 0;
+}

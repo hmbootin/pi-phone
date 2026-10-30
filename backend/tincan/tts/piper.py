@@ -92,14 +92,16 @@ class Tts:
         _, err = await asyncio.wait_for(proc.communicate(text.encode()), timeout=60)
         if proc.returncode != 0:
             raise RuntimeError(err.decode(errors="replace")[-300:])
-        await asyncio.to_thread(convert_to_8k_mono, raw, out)
+        await asyncio.to_thread(convert_wav, raw, out, TARGET_RATE)
         raw.unlink(missing_ok=True)
 
 
-def convert_to_8k_mono(src: Path, dst: Path) -> None:
-    """Resample any 16-bit PCM WAV to 8 kHz mono with linear interpolation (no numpy on the Pi)."""
+def convert_wav(src: Path, dst: Path, rate: int = TARGET_RATE) -> None:
+    """Resample any 16-bit PCM WAV to mono at `rate` with linear interpolation (no numpy on the Pi).
+
+    Prompts use 8 kHz (Asterisk's format_wav); ringtones use 16 kHz (the base speaker)."""
     with wave.open(str(src), "rb") as w:
-        channels, width, rate = w.getnchannels(), w.getsampwidth(), w.getframerate()
+        channels, width, src_rate = w.getnchannels(), w.getsampwidth(), w.getframerate()
         frames = w.readframes(w.getnframes())
     if width != 2:
         raise ValueError(f"expected 16-bit PCM, got {width * 8}-bit")
@@ -108,10 +110,10 @@ def convert_to_8k_mono(src: Path, dst: Path) -> None:
     if channels > 1:
         samples = [sum(samples[i * channels : (i + 1) * channels]) // channels for i in range(n)]
     out: list[int] = []
-    if rate == TARGET_RATE:
+    if src_rate == rate:
         out = list(samples)
     else:
-        step = rate / TARGET_RATE
+        step = src_rate / rate
         total = int(n / step)
         for i in range(total):
             pos = i * step
@@ -123,7 +125,7 @@ def convert_to_8k_mono(src: Path, dst: Path) -> None:
     with wave.open(str(dst), "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
-        w.setframerate(TARGET_RATE)
+        w.setframerate(rate)
         w.writeframes(struct.pack(f"<{len(out)}h", *out))
 
 

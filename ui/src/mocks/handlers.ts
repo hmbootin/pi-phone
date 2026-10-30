@@ -10,6 +10,7 @@ import type {
   FeatureKind,
   Recording,
   RecordingKind,
+  Ringtone,
   SettingsPatch,
 } from '../api/types';
 import { MOCK_PASSWORD, seedDb, type MockDb } from './data';
@@ -59,6 +60,16 @@ function previewText(f: Feature): string {
     case 'none':
       return 'That button does nothing. Try another one!';
   }
+}
+
+/** Mirrors the backend: file stem, lower-cased, non [a-z0-9_-] runs become '-', max 32 chars. */
+function ringtoneSlug(filename: string): string {
+  const stem = filename.replace(/\.[^.]*$/, '').toLowerCase();
+  return stem
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^[-_]+|[-_]+$/g, '')
+    .slice(0, 32)
+    .replace(/[-_]+$/, '');
 }
 
 const audioResponse = () =>
@@ -147,6 +158,9 @@ export const handlers = [
     const denied = requireAuth();
     if (denied) return denied;
     const patch = (await request.json()) as SettingsPatch;
+    if (patch.ringtone !== undefined && !db.ringtones.some((r) => r.name === patch.ringtone)) {
+      return error(422, 'unknown_ringtone', `No ringtone named '${patch.ringtone}'.`);
+    }
     db.settings = {
       ...db.settings,
       ...patch,
@@ -155,6 +169,47 @@ export const handlers = [
       weather_location: { ...db.settings.weather_location, ...(patch.weather_location ?? {}) },
     };
     return HttpResponse.json(db.settings);
+  }),
+
+  // Ringtones
+  http.get('/api/ringtones', () => requireAuth() ?? HttpResponse.json(db.ringtones)),
+  http.post('/api/ringtones', async ({ request }) => {
+    const denied = requireAuth();
+    if (denied) return denied;
+    const form = await request.formData();
+    const file = form.get('file') as File | string | null;
+    // Not instanceof File: under vitest the parsed File comes from Node's realm, not jsdom's.
+    if (file === null || typeof file === 'string') return error(400, 'invalid_wav', 'Only WAV files (16-bit PCM) are accepted');
+    const name = ringtoneSlug(file.name);
+    if (!name) return error(400, 'bad_name', 'The file name must contain a letter or digit');
+    if (db.ringtones.some((r) => r.name === name && r.builtin)) {
+      return error(409, 'ringtone_builtin', `'${name}' is a built-in ringtone; rename the file`);
+    }
+    if (!/\.wav$/i.test(file.name)) return error(400, 'invalid_wav', 'Only WAV files (16-bit PCM) are accepted');
+    if (file.size > 2 * 1024 * 1024) return error(413, 'too_large', 'Ringtones must be under 2048 KB');
+    const seconds = Math.min(10, Math.max(0.5, Math.round((file.size / 32_000) * 10) / 10)); // pretend 16 kHz mono
+    const entry: Ringtone = { name, builtin: false, duration_seconds: seconds, audio_url: `/api/ringtones/${name}/audio` };
+    db.ringtones = [...db.ringtones.filter((r) => r.name !== name), entry];
+    await delay(200);
+    return HttpResponse.json(entry, { status: 201 });
+  }),
+  http.delete('/api/ringtones/:name', ({ params }) => {
+    const denied = requireAuth();
+    if (denied) return denied;
+    const name = String(params.name);
+    const existing = db.ringtones.find((r) => r.name === name);
+    if (!existing) return error(404, 'not_found', `No ringtone named '${name}'.`);
+    if (existing.builtin) return error(409, 'ringtone_builtin', 'Built-in ringtones cannot be deleted');
+    db.ringtones = db.ringtones.filter((r) => r.name !== name);
+    if (db.settings.ringtone === name) db.settings = { ...db.settings, ringtone: 'classic' };
+    return new HttpResponse(null, { status: 204 });
+  }),
+  http.get('/api/ringtones/:name/audio', ({ params }) => {
+    const tone = db.ringtones.find((r) => r.name === String(params.name));
+    if (!tone) return error(404, 'not_found', 'No such ringtone.');
+    return HttpResponse.arrayBuffer(makeToneWav(tone.duration_seconds, tone.builtin ? 880 : 660), {
+      headers: { 'Content-Type': 'audio/wav' },
+    });
   }),
 
   // Calls

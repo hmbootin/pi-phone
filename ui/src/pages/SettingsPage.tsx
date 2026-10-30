@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useContacts, useSettings, useSettingsMutation, useTestCall } from '../api/hooks';
 import type { Settings } from '../api/types';
 import { ErrorText } from '../components/ErrorText';
+import { RingtonePicker } from '../components/RingtonePicker';
 
 function timezones(): string[] {
   const intl = Intl as unknown as { supportedValuesOf?: (k: string) => string[] };
@@ -113,6 +114,9 @@ export function SettingsPage() {
             </select>
           </div>
         </div>
+
+        <h2>Ringtone</h2>
+        <RingtonePicker value={form.ringtone} volume={form.ringer_volume} onChange={(name) => set('ringtone', name)} onVolume={(v) => set('ringer_volume', v)} />
 
         <h2>Notifications</h2>
         <div className="card">

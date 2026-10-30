@@ -17,6 +17,7 @@ export const keys = {
   calls: (q: CallsQuery = {}) => ['calls', q] as const,
   activeCall: ['calls', 'active'] as const,
   recordings: (q: RecordingsQuery = {}) => ['recordings', q] as const,
+  ringtones: ['ringtones'] as const,
   status: ['status'] as const,
 };
 
@@ -106,6 +107,27 @@ export function useMarkListened() {
       api.recordings.markListened(id, listened),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['recordings'] }),
   });
+}
+
+export function useRingtones() {
+  return useQuery({ queryKey: keys.ringtones, queryFn: api.ringtones.list });
+}
+
+export function useRingtoneMutations() {
+  const qc = useQueryClient();
+  const upload = useMutation({
+    mutationFn: (file: File) => api.ringtones.upload(file),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.ringtones }),
+  });
+  const remove = useMutation({
+    mutationFn: (name: string) => api.ringtones.remove(name),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.ringtones });
+      // Deleting the active ringtone resets settings.ringtone on the backend.
+      void qc.invalidateQueries({ queryKey: keys.settings });
+    },
+  });
+  return { upload, remove };
 }
 
 export function useStatus() {
