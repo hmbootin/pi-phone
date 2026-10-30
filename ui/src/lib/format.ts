@@ -1,4 +1,4 @@
-import type { Call, CallOutcome, Contact, FeatureKind } from '../api/types';
+import type { Call, CallOutcome, Contact, FeatureKind, MemoryKey } from '../api/types';
 
 export function formatDuration(seconds: number | null | undefined): string {
   if (seconds == null) return '—';
@@ -170,4 +170,24 @@ export function nextMorning(hour = 7, minute = 30, now = new Date()): Date {
 
 export function isDndActive(contact: Contact, now = new Date()): boolean {
   return contact.dnd_until != null && new Date(contact.dnd_until) > now;
+}
+
+export const MEMORY_KEY_LABELS: Record<MemoryKey, string> = {
+  m1: 'M1',
+  m2: 'M2',
+  m3: 'M3',
+  m4: 'M4',
+  m5: 'M5',
+  m6: 'M6',
+  m7: 'M7',
+  m8: 'M8',
+  m9: 'M9',
+  sos: 'SOS',
+};
+
+/** What the toddler presses to reach this contact, for the badge. */
+export function contactKeyLabel(c: Pick<Contact, 'speed_dial' | 'memory_key'>): string {
+  if (c.speed_dial != null) return String(c.speed_dial);
+  if (c.memory_key != null) return MEMORY_KEY_LABELS[c.memory_key];
+  return '–';
 }

@@ -37,6 +37,7 @@ class Contact(Base):
     spoken_name: Mapped[str]
     number: Mapped[str]
     speed_dial: Mapped[int | None]
+    memory_key: Mapped[str | None] = mapped_column(String)
     enabled: Mapped[bool] = mapped_column(default=True)
     inbound_allowed: Mapped[bool] = mapped_column(default=True)
     dnd_until: Mapped[str | None] = mapped_column(String)

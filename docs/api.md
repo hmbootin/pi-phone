@@ -14,6 +14,7 @@ over Tailscale that is enough for v1.
   "spoken_name": "Grandma Jo",
   "number": "+15555550123",
   "speed_dial": 2,
+  "memory_key": "m1",
   "enabled": true,
   "inbound_allowed": true,
   "dnd_until": null,
@@ -21,8 +22,12 @@ over Tailscale that is enough for v1.
   "created_at": "2026-10-29T03:00:00Z"
 }
 ```
+`speed_dial` (0-9) and `memory_key` (`m1`..`m9`, `sos`; case-insensitive on input, lowercase on
+output) are both optional and both unique across contacts. A contact with neither cannot be
+dialed but can still call in. The phone's memory keys are dialed as extensions of the same name.
 - `GET /api/contacts` → `Contact[]`
-- `POST /api/contacts` body without `id`/`created_at` → `Contact` (409 if speed dial taken)
+- `POST /api/contacts` body without `id`/`created_at` → `Contact` (409 `speed_dial_taken` /
+  `memory_key_taken` if the digit or key is already used)
 - `PATCH /api/contacts/{id}` partial → `Contact`
 - `DELETE /api/contacts/{id}` → 204
 - `POST /api/contacts/{id}/dnd` `{"minutes": 120}` or `{"until": "...Z"}` or `{"clear": true}` → `Contact`

@@ -78,8 +78,11 @@ export const handlers = [
     const denied = requireAuth();
     if (denied) return denied;
     const input = (await request.json()) as ContactInput;
-    if (db.contacts.some((c) => c.speed_dial === input.speed_dial)) {
+    if (input.speed_dial != null && db.contacts.some((c) => c.speed_dial === input.speed_dial)) {
       return error(409, 'speed_dial_taken', `Speed dial ${input.speed_dial} is already used by another contact.`);
+    }
+    if (input.memory_key != null && db.contacts.some((c) => c.memory_key === input.memory_key)) {
+      return error(409, 'memory_key_taken', `Key ${input.memory_key.toUpperCase()} is already used by another contact.`);
     }
     const contact: Contact = { ...input, id: db.nextId++, created_at: new Date().toISOString() };
     db.contacts.push(contact);
@@ -93,8 +96,11 @@ export const handlers = [
     const contact = db.contacts.find((c) => c.id === id);
     if (!contact) return error(404, 'not_found', 'No such contact.');
     const patch = (await request.json()) as ContactPatch;
-    if (patch.speed_dial !== undefined && db.contacts.some((c) => c.id !== id && c.speed_dial === patch.speed_dial)) {
+    if (patch.speed_dial != null && db.contacts.some((c) => c.id !== id && c.speed_dial === patch.speed_dial)) {
       return error(409, 'speed_dial_taken', `Speed dial ${patch.speed_dial} is already used by another contact.`);
+    }
+    if (patch.memory_key != null && db.contacts.some((c) => c.id !== id && c.memory_key === patch.memory_key)) {
+      return error(409, 'memory_key_taken', `Key ${patch.memory_key.toUpperCase()} is already used by another contact.`);
     }
     Object.assign(contact, patch);
     return HttpResponse.json(contact);

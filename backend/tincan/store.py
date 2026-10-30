@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from tincan import models
 from tincan.db import Database
 from tincan.models import Call, Contact, Feature, Recording, SettingsRow, dt_to_str
-from tincan.schemas import Settings
+from tincan.schemas import MEMORY_KEYS, Settings
 
 
 def get_settings(db: Database) -> Settings:
@@ -35,6 +35,19 @@ def save_settings(db: Database, settings: Settings) -> None:
 def contact_by_digit(db: Database, digit: int) -> Contact | None:
     with db.session() as s:
         return s.scalar(select(Contact).where(Contact.speed_dial == digit))
+
+
+def contact_by_memory_key(db: Database, key: str) -> Contact | None:
+    with db.session() as s:
+        return s.scalar(select(Contact).where(Contact.memory_key == key))
+
+
+def contact_by_dialed(db: Database, dialed: str) -> Contact | None:
+    """What the phone dialed: a single digit ("2") or a memory key ("m1", "sos")."""
+    if dialed[:1].isdigit():
+        return contact_by_digit(db, int(dialed[0]))
+    key = dialed.strip().lower()
+    return contact_by_memory_key(db, key) if key in MEMORY_KEYS else None
 
 
 def contact_by_id(db: Database, contact_id: int | None) -> Contact | None:

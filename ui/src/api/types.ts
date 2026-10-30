@@ -1,11 +1,17 @@
 // Hand-written from docs/api.md. Keep in sync with the contract.
 
+export const MEMORY_KEYS = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8', 'm9', 'sos'] as const;
+export type MemoryKey = (typeof MEMORY_KEYS)[number];
+
 export interface Contact {
   id: number;
   name: string;
   spoken_name: string;
   number: string;
-  speed_dial: number;
+  /** 0-9, or null when the contact is only on a memory key. */
+  speed_dial: number | null;
+  /** 'm1'..'m9' or 'sos': the phone's dedicated keys. */
+  memory_key: MemoryKey | null;
   enabled: boolean;
   inbound_allowed: boolean;
   dnd_until: string | null;

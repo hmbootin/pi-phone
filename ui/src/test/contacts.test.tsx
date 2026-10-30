@@ -64,3 +64,26 @@ describe('ContactsPage', () => {
     await waitFor(() => expect(screen.queryByRole('article', { name: 'Dad at work' })).not.toBeInTheDocument());
   });
 });
+
+describe('ContactsPage memory keys', () => {
+  it('shows the memory key on the badge and offers free keys in the form', async () => {
+    const { user } = renderPage(<ContactsPage />);
+    const grandma = await screen.findByRole('article', { name: 'Grandma' });
+    expect(within(grandma).getByLabelText('Speed dial 2')).toHaveAttribute('title', 'Also on M1');
+
+    await user.click(screen.getByRole('button', { name: 'Add contact' }));
+    const form = screen.getByRole('form', { name: 'New contact' });
+    await user.type(within(form).getByLabelText('Name'), 'Mom');
+    await user.type(within(form).getByLabelText('Phone number'), '+15555550101');
+    // Save needs a digit or a key.
+    expect(within(form).getByRole('button', { name: 'Save' })).toBeDisabled();
+    const select = within(form).getByLabelText('Memory key');
+    expect(within(select).getByRole('option', { name: /M1/ })).toBeDisabled();
+    await user.selectOptions(select, 'sos');
+    await user.click(within(form).getByRole('button', { name: 'Save' }));
+
+    const mom = await screen.findByRole('article', { name: 'Mom' });
+    expect(within(mom).getByLabelText('Key SOS')).toHaveTextContent('SOS');
+    expect(db.contacts.find((c) => c.name === 'Mom')).toMatchObject({ speed_dial: null, memory_key: 'sos' });
+  });
+});

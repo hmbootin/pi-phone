@@ -69,6 +69,11 @@ MIGRATIONS: list[str] = [
         value TEXT
     );
     """,
+    # v2: memory keys (M1..M9, SOS) as a second way to reach a contact
+    """
+    ALTER TABLE contacts ADD COLUMN memory_key TEXT;
+    CREATE UNIQUE INDEX contacts_memory_key ON contacts(memory_key);
+    """,
 ]
 
 

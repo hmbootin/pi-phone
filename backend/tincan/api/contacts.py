@@ -29,6 +29,16 @@ def _speed_dial_free(s, digit: int | None, exclude: int | None = None) -> None:
         )
 
 
+def _memory_key_free(s, key: str | None, exclude: int | None = None) -> None:
+    if key is None:
+        return
+    other = s.scalar(select(Contact).where(Contact.memory_key == key))
+    if other is not None and other.id != exclude:
+        raise ApiError(
+            409, "memory_key_taken", f"Key {key.upper()} is already used by {other.name}"
+        )
+
+
 @router.get("")
 async def list_contacts(request: Request) -> list[ContactOut]:
     with runtime(request).db.session() as s:
@@ -43,11 +53,13 @@ async def create_contact(body: ContactIn, request: Request) -> ContactOut:
     rt = runtime(request)
     with rt.db.session() as s:
         _speed_dial_free(s, body.speed_dial)
+        _memory_key_free(s, body.memory_key)
         c = Contact(
             name=body.name,
             spoken_name=body.spoken_name or body.name,
             number=body.number,
             speed_dial=body.speed_dial,
+            memory_key=body.memory_key,
             enabled=body.enabled,
             inbound_allowed=body.inbound_allowed,
             dnd_until=dt_to_str(body.dnd_until),
@@ -57,7 +69,7 @@ async def create_contact(body: ContactIn, request: Request) -> ContactOut:
         try:
             s.flush()
         except IntegrityError as exc:
-            raise ApiError(409, "speed_dial_taken", "Speed dial already used") from exc
+            raise ApiError(409, "speed_dial_taken", "Speed dial or key already used") from exc
         return ContactOut.from_row(c)
 
 
@@ -69,6 +81,8 @@ async def patch_contact(contact_id: int, body: ContactPatch, request: Request) -
         c = _get(rt, contact_id, s)
         if "speed_dial" in fields:
             _speed_dial_free(s, fields["speed_dial"], exclude=c.id)
+        if "memory_key" in fields:
+            _memory_key_free(s, fields["memory_key"], exclude=c.id)
         if "dnd_until" in fields:
             fields["dnd_until"] = dt_to_str(fields["dnd_until"])
         for k, v in fields.items():
