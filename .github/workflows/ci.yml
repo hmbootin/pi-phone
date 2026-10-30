@@ -64,7 +64,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update -q && sudo apt-get install -y -q gettext-base shellcheck hadolint
+      - run: sudo apt-get update -q && sudo apt-get install -y -q gettext-base shellcheck
+      # hadolint is not an apt package; pin the upstream static binary.
+      - name: install hadolint
+        run: |
+          sudo curl -fsSL -o /usr/local/bin/hadolint \
+            https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64
+          sudo chmod +x /usr/local/bin/hadolint
+          hadolint --version
       - name: shellcheck + hadolint
         run: |
           shellcheck -S warning asterisk/entrypoint.sh deploy/*.sh
