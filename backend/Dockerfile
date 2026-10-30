@@ -23,9 +23,9 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.3 /uv /uvx /bin/
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PROJECT_ENVIRONMENT=/app/.venv
 WORKDIR /app
 COPY backend/pyproject.toml backend/uv.lock backend/README.md ./
-RUN uv sync --frozen --no-dev --no-install-project
+RUN uv sync --frozen --no-dev --no-install-project --extra pi
 COPY backend/tincan ./tincan
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --extra pi
 
 # Piper TTS (abi3 wheels exist for arm64 and amd64). The voice is fetched at build time so the
 # image is self-contained (~65 MB for en_US-lessac-medium). If the download fails the build still

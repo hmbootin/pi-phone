@@ -114,6 +114,11 @@ Everything is in one SQLite file at `/data/tincan.db`. Audio lives under `/data/
   jack, dial tone on the USB adapter while baresip is idle).
 - `phone` (baresip) gets `/dev/snd` for the USB adapter and talks SIP to Asterisk over loopback
   (both on host networking).
+- The backend's `tincan.hardware` package owns the phone side: `gpio.py` scans the key matrix and
+  hook (map in `hardware/pinmap.toml`), `alsa.py` plays dial tone and the ringer with `aplay`,
+  `baresip.py` talks to the `phone` service over `ctrl_tcp`, and `machine.py` is the state machine
+  (idle → dial tone → dialing → in call; idle → ringing → in call). `TINCAN_HARDWARE` picks
+  `gpio`, `fake` or `none`.
 - Fakes for all three (ARI, GPIO, baresip control) are used in tests and in `mise run demo`.
 
 ## Networking

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import secrets
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -30,6 +31,21 @@ class Config(BaseSettings):
     # Where ARI stored recordings land on the shared /data mount. Asterisk always writes them to
     # <astspooldir>/recording, and asterisk/etc/asterisk.conf sets astspooldir=/data/asterisk.
     tincan_recordings_dir: Path | None = None
+
+    # The phone hardware: "none" (no phone attached; the ATA-less dev default), "fake" (in-process
+    # fakes, used by `mise run demo` together with TINCAN_FAKE_ARI) or "gpio" (the real keypad,
+    # hook, ALSA tones and baresip on the Pi).
+    tincan_hardware: Literal["none", "fake", "gpio"] = "none"
+    tincan_pinmap: Path | None = None  # default: <repo>/hardware/pinmap.toml
+    # baresip's ctrl_tcp (the `phone` Compose service). From the backend container the Pi host
+    # is host.docker.internal; Asterisk is reached by baresip at ASTERISK_SIP_HOST.
+    phone_ctrl_host: str = "127.0.0.1"
+    phone_ctrl_port: int = 4444
+    asterisk_sip_host: str = "127.0.0.1"
+    # ALSA devices: handset tones go to the USB adapter, the ringer to the Pi's headphone jack.
+    handset_audio_device: str = "plughw:1,0"
+    ringer_audio_device: str = "plughw:0,0"
+    ringer_mixer: str | None = None  # amixer control for ringer volume, e.g. "PCM"
 
     ari_url: str = "http://localhost:8088"
     ari_user: str = "tincan"

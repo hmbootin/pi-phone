@@ -1,0 +1,48 @@
+# GPIO map for the LD-858 keypad, hook switch and LED. BCM numbering, matching the budget in
+# phone-interface.md section 7. Read by backend/tincan/hardware/pinmap.py (the scanner) and by
+# scripts/keyscan.py (the stage-2 bench test).
+#
+# STATUS: the [keys] table is a GUESS from the keypad layout, written before the section 3.1
+# multimeter survey. Replace every entry with the measured (row, col) pair, delete rows/cols
+# you did not need, and keep hook_closed_when_down honest (section 3.2).
+
+[gpio]
+rows = [5, 6, 13, 19, 25, 8]      # ROW1..ROW6: inputs with pull-up, 1 kΩ in series
+cols = [12, 16, 20, 21, 7]        # COL1..COL5: outputs, driven low one at a time
+hook = 26                         # HK: input with pull-up, the other contact to GND
+hook_closed_when_down = true      # true: reads LOW while the handset sits on the cradle
+# led = 17                        # optional: the keypad's "USE" LED through 330 Ω
+
+[scan]
+hz = 100
+debounce_ms = 20
+
+# key = [row, col], 1-based into the lists above. Key names are the ones the backend expects:
+# "0".."9", "*", "#", "m1".."m9", "sos", "store", "speaker", "redial", "flash".
+[keys]
+"1" = [1, 1]
+"2" = [1, 2]
+"3" = [1, 3]
+"4" = [2, 1]
+"5" = [2, 2]
+"6" = [2, 3]
+"7" = [3, 1]
+"8" = [3, 2]
+"9" = [3, 3]
+"*" = [4, 1]
+"0" = [4, 2]
+"#" = [4, 3]
+store = [1, 4]
+speaker = [2, 4]
+redial = [3, 4]
+flash = [4, 4]
+m1 = [5, 1]
+m2 = [5, 2]
+m3 = [5, 3]
+m4 = [5, 4]
+m5 = [5, 5]
+m6 = [6, 1]
+m7 = [6, 2]
+m8 = [6, 3]
+m9 = [6, 4]
+sos = [6, 5]

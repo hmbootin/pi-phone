@@ -77,6 +77,9 @@ class FakeAri:
         self.hangups: list[str] = []
         self.endpoints: dict[str, str] = {"PJSIP/phone": "online", "PJSIP/trunk": "online"}
         self.fail_next_originate: int | None = None
+        # Optional tincan.hardware.fake.FakePhone: when set, PJSIP/phone originates ring it
+        # instead of auto-answering, and its answer/hangup reach the channel here.
+        self.phone: Any = None
         self._queue: asyncio.Queue[AriEvent] = asyncio.Queue()
         self._seq = itertools.count(1)
         self._closed = False
@@ -135,6 +138,8 @@ class FakeAri:
         if ch.in_stasis:
             self.emit(StasisEnd(channel=ch.to_channel()))
         self.emit(ChannelDestroyed(channel=ch.to_channel(), cause=cause, cause_txt=str(cause)))
+        if self.phone is not None and ch.name.startswith("PJSIP/phone"):
+            self.phone.ari_hung_up(channel_id)
 
     def press_digit(self, channel_id: str, digit: str) -> None:
         ch = self.channels[channel_id]
@@ -159,6 +164,8 @@ class FakeAri:
         if ch and ch.state != "Up":
             ch.state = "Up"
             self.emit(ChannelStateChange(channel=ch.to_channel()))
+            if self.phone is not None and ch.name.startswith("PJSIP/phone"):
+                self.phone.ari_answered(channel_id)
 
     async def ring(self, channel_id: str) -> None:
         pass
@@ -188,14 +195,18 @@ class FakeAri:
                 "caller_id": caller_id,
             }
         )
+        name = f"PJSIP/phone-{channel_id}" if endpoint == "PJSIP/phone" else channel_id
         ch = FakeChannel(
-            id=channel_id, name=channel_id, state="Ringing", app_args=args, endpoint=endpoint
+            id=channel_id, name=name, state="Ringing", app_args=args, endpoint=endpoint
         )
         self.channels[channel_id] = ch
         self.emit(ChannelStateChange(channel=ch.to_channel()))
         if self.fail_next_originate is not None:
             cause, self.fail_next_originate = self.fail_next_originate, None
             asyncio.get_running_loop().call_soon(self.hangup_channel, channel_id, cause)
+            return
+        if self.phone is not None and endpoint == "PJSIP/phone":
+            self.phone.ari_originated(channel_id)
             return
         if self.auto_answer_delay is not None:
             asyncio.get_running_loop().call_later(

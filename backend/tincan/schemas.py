@@ -255,6 +255,15 @@ class SystemStatus(BaseModel):
     backup: BackupStatus
 
 
+class PhoneStatus(BaseModel):
+    attached: bool
+    hardware: Literal["none", "fake", "gpio"]
+    state: Literal["idle", "dial_tone", "dialing", "ringing", "in_call"] | None = None
+    off_hook: bool | None = None
+    dialed: str | None = None
+    sip: Literal["connected", "disconnected"] | None = None
+
+
 class LoginIn(BaseModel):
     password: str
 

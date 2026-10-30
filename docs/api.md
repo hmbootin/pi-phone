@@ -75,8 +75,17 @@ Kinds: `speed_dial` (implicit, from contacts), `weather`, `fun_fact`, `secret_me
 ## System
 
 - `GET /api/system/status` → `{"asterisk": "connected"|"disconnected", "phone": "registered"|"unregistered", "trunk": "registered"|"unregistered"|"unconfigured", "version": "...", "disk_free_bytes", "backup": {"last_ok_at", "pending": 3}}`
-- `GET /api/events` → Server-Sent Events: `call.started`, `call.ended`, `recording.created`, `status.changed`
+- `GET /api/system/phone` → the phone-side state machine: `{"attached": true, "hardware": "none"|"fake"|"gpio", "state": "idle"|"dial_tone"|"dialing"|"ringing"|"in_call", "off_hook": bool, "dialed": "m1"|null, "sip": "connected"|"disconnected"}`. With no phone (`hardware: none`) `attached` is false and the other fields null.
+- `GET /api/events` → Server-Sent Events: `call.started`, `call.ended`, `recording.created`, `status.changed`, `phone.changed` (same body as `/api/system/phone` minus `attached`/`hardware`)
 - `POST /api/system/test-call` `{"contact_id": 1}` → rings the phone with a test prompt (parents verify the line works)
+
+## Dev (only with `TINCAN_FAKE_ARI=1`)
+
+- `POST /api/dev/simulate` drives the fakes. Phone hardware (needs `TINCAN_HARDWARE=fake`):
+  `{"event": "offhook"}`, `{"event": "onhook"}`, `{"event": "key", "key": "m1"}` (keys: `0`-`9`, `*`, `#`,
+  `m1`-`m9`, `sos`, `store`, `speaker`, `redial`, `flash`). Asterisk side: `{"event": "inbound", "from": "+1..."}`,
+  `{"event": "answer"}` (far end picks up), `{"event": "hangup"}` (far end hangs up),
+  `{"event": "offhook_dial", "digit": "2"}` (a channel enters Stasis directly, bypassing the phone).
 
 ## Errors
 
