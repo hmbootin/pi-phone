@@ -133,7 +133,8 @@ class CallRouter:
         now = utcnow()
         digit = int(dialed[0]) if dialed[:1].isdigit() else None
         line_busy = self.active is not None
-        contact = store.contact_by_digit(rt.db, digit) if digit is not None else None
+        # A contact is reached by a digit (speed dial) or by a memory key (m1..m9, sos).
+        contact = store.contact_by_dialed(rt.db, dialed)
         if contact is not None:
             calls_today = store.outbound_calls_today(rt.db, settings, now)
             rejection = policy.check_outbound(

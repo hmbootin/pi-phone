@@ -56,7 +56,7 @@ values (`external_media_address =` with nothing after it is valid for PJSIP).
 | `pjsip_trunk_telnyx.conf.tmpl` | Same shape for Telnyx credentials connections (registration to `sip.telnyx.com`) |
 | `pjsip_trunk_twilio.conf.tmpl` | `trunk` endpoint for Twilio Elastic SIP Trunking (no REGISTER; needs 5060/udp + RTP reachable) |
 | `pjsip_trunk_none.conf` | No trunk. Backend reports trunk `unconfigured` |
-| `extensions.conf` | `from-phone`: `_X`/`_X.` -> `Stasis(tincan,dial,${EXTEN})`; `from-trunk`: `_X.` -> `Stasis(tincan,inbound)`; both fall through to a safe beep-and-hangup if the backend is down |
+| `extensions.conf` | `from-phone`: `_X`/`_X.`, `_m[1-9]` and `sos` -> `Stasis(tincan,dial,${EXTEN})`; `from-trunk`: `_X.` -> `Stasis(tincan,inbound)`; both fall through to a safe beep-and-hangup if the backend is down |
 | `logger.conf` | Console + messages log |
 
 ## Ports

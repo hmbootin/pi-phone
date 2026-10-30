@@ -16,8 +16,8 @@ async def test_crud_and_shape(client, grandma):
     assert grandma["spoken_name"] == "Grandma Jo"
     assert grandma["created_at"].endswith("Z")
     assert set(grandma) == {
-        "id", "name", "spoken_name", "number", "speed_dial", "enabled", "inbound_allowed",
-        "dnd_until", "max_call_minutes", "created_at",
+        "id", "name", "spoken_name", "number", "speed_dial", "memory_key", "enabled",
+        "inbound_allowed", "dnd_until", "max_call_minutes", "created_at",
     }  # fmt: skip
     r = await client.get("/api/contacts")
     assert [c["name"] for c in r.json()] == ["Grandma"]
@@ -70,3 +70,23 @@ async def test_dnd(client, grandma):
     assert r.json()["dnd_until"] is None
     r = await client.post(f"/api/contacts/{cid}/dnd", json={})
     assert r.status_code == 400
+
+
+async def test_memory_key_crud_and_conflict(client, grandma):
+    r = await client.patch(f"/api/contacts/{grandma['id']}", json={"memory_key": "M1"})
+    assert r.status_code == 200 and r.json()["memory_key"] == "m1"
+    r = await client.post(
+        "/api/contacts", json={"name": "Mom", "number": "+15555550101", "memory_key": "m1"}
+    )
+    assert r.status_code == 409 and r.json()["error"]["code"] == "memory_key_taken"
+    r = await client.post(
+        "/api/contacts", json={"name": "Mom", "number": "+15555550101", "memory_key": "sos"}
+    )
+    assert r.status_code == 201 and r.json()["memory_key"] == "sos"
+    assert r.json()["speed_dial"] is None
+    r = await client.post(
+        "/api/contacts", json={"name": "Nobody", "number": "+15555550102", "memory_key": "m10"}
+    )
+    assert r.status_code == 422
+    r = await client.patch(f"/api/contacts/{grandma['id']}", json={"memory_key": None})
+    assert r.status_code == 200 and r.json()["memory_key"] is None

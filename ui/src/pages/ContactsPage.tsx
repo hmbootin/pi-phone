@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { useContactMutations, useContacts, useFeatures } from '../api/hooks';
-import type { Contact, ContactInput, Feature } from '../api/types';
+import { MEMORY_KEYS, type Contact, type ContactInput, type Feature, type MemoryKey } from '../api/types';
 import { ErrorText } from '../components/ErrorText';
 import { Toggle } from '../components/Toggle';
-import { FEATURE_LABELS, formatRelativeUntil, isDndActive, nextMorning } from '../lib/format';
+import { FEATURE_LABELS, MEMORY_KEY_LABELS, contactKeyLabel, formatRelativeUntil, isDndActive, nextMorning } from '../lib/format';
 
 const EMPTY: ContactInput = {
   name: '',
   spoken_name: '',
   number: '',
-  speed_dial: -1,
+  speed_dial: null,
+  memory_key: null,
   enabled: true,
   inbound_allowed: true,
   dnd_until: null,
@@ -37,8 +38,8 @@ export function DigitPicker({
   onChange,
   uses,
 }: {
-  value: number;
-  onChange: (d: number) => void;
+  value: number | null;
+  onChange: (d: number | null) => void;
   uses: DigitUse[];
 }) {
   return (
@@ -59,7 +60,7 @@ export function DigitPicker({
               aria-label={`Digit ${d}, ${sub}`}
               className={value === d ? 'selected' : ''}
               disabled={taken}
-              onClick={() => onChange(d)}
+              onClick={() => onChange(value === d ? null : d)}
               title={taken ? `Used by ${u.name}` : undefined}
             >
               <span className="d">{d}</span>
@@ -68,9 +69,52 @@ export function DigitPicker({
           );
         })}
       </div>
-      <span className="hint">Digits used by a feature can be reassigned; the feature will be replaced.</span>
+      <span className="hint">
+        Tap again to clear. Digits used by a feature can be reassigned; the feature will be replaced.
+      </span>
     </div>
   );
+}
+
+function MemoryKeyPicker({
+  value,
+  onChange,
+  contacts,
+  selfId,
+}: {
+  value: MemoryKey | null;
+  onChange: (k: MemoryKey | null) => void;
+  contacts: Contact[];
+  selfId: number | null;
+}) {
+  return (
+    <div className="field">
+      <label htmlFor="c-memory-key">Memory key</label>
+      <select
+        id="c-memory-key"
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value === '' ? null : (e.target.value as MemoryKey))}
+      >
+        <option value="">None</option>
+        {MEMORY_KEYS.map((k) => {
+          const owner = contacts.find((c) => c.memory_key === k && c.id !== selfId);
+          return (
+            <option key={k} value={k} disabled={owner != null}>
+              {MEMORY_KEY_LABELS[k]}
+              {owner ? ` (${owner.name})` : ''}
+            </option>
+          );
+        })}
+      </select>
+      <span className="hint">The phone&rsquo;s big buttons. SOS is a good fit for a parent.</span>
+    </div>
+  );
+}
+
+function keyOrder(c: Contact): number {
+  if (c.speed_dial != null) return c.speed_dial;
+  if (c.memory_key != null) return 10 + MEMORY_KEYS.indexOf(c.memory_key);
+  return 99;
 }
 
 function ContactForm({
@@ -134,6 +178,7 @@ function ContactForm({
         />
       </div>
       <DigitPicker value={form.speed_dial} onChange={(d) => set('speed_dial', d)} uses={uses} />
+      <MemoryKeyPicker value={form.memory_key} onChange={(k) => set('memory_key', k)} contacts={contacts} selfId={selfId} />
       <div className="field">
         <label htmlFor="c-max">Max minutes per call</label>
         <input
@@ -158,7 +203,7 @@ function ContactForm({
         <button
           type="submit"
           className="btn primary grow"
-          disabled={m.isPending || form.speed_dial < 0 || !form.name || !form.number}
+          disabled={m.isPending || (form.speed_dial == null && form.memory_key == null) || !form.name || !form.number}
         >
           {m.isPending ? 'Saving…' : 'Save'}
         </button>
@@ -226,6 +271,7 @@ function ContactCard({
       spoken_name: contact.spoken_name,
       number: contact.number,
       speed_dial: contact.speed_dial,
+      memory_key: contact.memory_key,
       enabled: contact.enabled,
       inbound_allowed: contact.inbound_allowed,
       dnd_until: contact.dnd_until,
@@ -246,13 +292,18 @@ function ContactCard({
   return (
     <article className="card" aria-label={contact.name}>
       <div className="row">
-        <span className={`badge digit ${contact.enabled ? '' : 'off'}`} aria-label={`Speed dial ${contact.speed_dial}`}>
-          {contact.speed_dial}
+        <span
+          className={`badge digit ${contact.enabled ? '' : 'off'}`}
+          aria-label={contact.speed_dial != null ? `Speed dial ${contact.speed_dial}` : `Key ${contactKeyLabel(contact)}`}
+          title={contact.memory_key && contact.speed_dial != null ? `Also on ${MEMORY_KEY_LABELS[contact.memory_key]}` : undefined}
+        >
+          {contactKeyLabel(contact)}
         </span>
         <div className="grow">
           <div className="strong truncate">{contact.name}</div>
           <div className="small muted truncate">
             {contact.number}
+            {contact.memory_key && contact.speed_dial != null && ` · ${MEMORY_KEY_LABELS[contact.memory_key]}`}
             {contact.max_call_minutes != null && ` · ${contact.max_call_minutes} min max`}
             {!contact.inbound_allowed && ' · outgoing only'}
           </div>
@@ -323,7 +374,7 @@ export function ContactsPage() {
       {contacts.isLoading && <div className="muted">Loading&hellip;</div>}
       {contacts.data?.length === 0 && !adding && <div className="empty">No contacts yet. Add the first one.</div>}
       {[...(contacts.data ?? [])]
-        .sort((a, b) => a.speed_dial - b.speed_dial)
+        .sort((a, b) => keyOrder(a) - keyOrder(b))
         .map((c) => (
           <ContactCard key={c.id} contact={c} contacts={contacts.data ?? []} features={features.data ?? []} />
         ))}

@@ -23,6 +23,20 @@ OUTCOMES = (
 )
 FEATURE_KINDS = ("speed_dial", "weather", "fun_fact", "secret_message", "mailbox", "song", "none")
 RECORDING_KINDS = ("call", "secret", "voicemail")
+# The phone's dedicated keys that can be bound to a contact. These are also the dialplan
+# extensions baresip dials (sip:m1@asterisk), so keep them lowercase and digit-free.
+MEMORY_KEYS = tuple(f"m{i}" for i in range(1, 10)) + ("sos",)
+
+
+def normalize_memory_key(v: str | None) -> str | None:
+    if v is None:
+        return None
+    key = v.strip().lower()
+    if key == "":
+        return None
+    if key not in MEMORY_KEYS:
+        raise ValueError("memory_key must be one of M1..M9 or SOS")
+    return key
 
 
 class ContactIn(BaseModel):
@@ -30,10 +44,16 @@ class ContactIn(BaseModel):
     spoken_name: str | None = None
     number: str = Field(min_length=1)
     speed_dial: int | None = Field(default=None, ge=0, le=9)
+    memory_key: str | None = None
     enabled: bool = True
     inbound_allowed: bool = True
     dnd_until: datetime | None = None
     max_call_minutes: int | None = Field(default=None, ge=1)
+
+    @field_validator("memory_key")
+    @classmethod
+    def _memory_key(cls, v: str | None) -> str | None:
+        return normalize_memory_key(v)
 
     @field_validator("number")
     @classmethod
@@ -52,12 +72,14 @@ class ContactPatch(BaseModel):
     spoken_name: str | None = None
     number: str | None = None
     speed_dial: int | None = Field(default=None, ge=0, le=9)
+    memory_key: str | None = None
     enabled: bool | None = None
     inbound_allowed: bool | None = None
     dnd_until: datetime | None = None
     max_call_minutes: int | None = None
 
     _number = field_validator("number")(ContactIn._number.__func__)  # type: ignore[attr-defined]
+    _memory_key = field_validator("memory_key")(ContactIn._memory_key.__func__)  # type: ignore[attr-defined]
 
 
 class ContactOut(BaseModel):
@@ -66,6 +88,7 @@ class ContactOut(BaseModel):
     spoken_name: str
     number: str
     speed_dial: int | None
+    memory_key: str | None
     enabled: bool
     inbound_allowed: bool
     dnd_until: str | None
@@ -80,6 +103,7 @@ class ContactOut(BaseModel):
             spoken_name=c.spoken_name,
             number=c.number,
             speed_dial=c.speed_dial,
+            memory_key=c.memory_key,
             enabled=bool(c.enabled),
             inbound_allowed=bool(c.inbound_allowed),
             dnd_until=c.dnd_until,

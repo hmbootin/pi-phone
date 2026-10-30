@@ -31,10 +31,22 @@ def cmd_serve(config: Config, args: argparse.Namespace) -> int:
 def seed_demo(db: Database) -> None:
     with db.session() as s:
         if s.get(Contact, 1) is None:
-            s.add(Contact(name="Mom", spoken_name="Mom", number="+15555550101", speed_dial=1))
             s.add(
                 Contact(
-                    name="Grandma", spoken_name="Grandma Jo", number="+15555550123", speed_dial=2
+                    name="Mom",
+                    spoken_name="Mom",
+                    number="+15555550101",
+                    speed_dial=1,
+                    memory_key="sos",
+                )
+            )
+            s.add(
+                Contact(
+                    name="Grandma",
+                    spoken_name="Grandma Jo",
+                    number="+15555550123",
+                    speed_dial=2,
+                    memory_key="m1",
                 )
             )
         for digit, kind, cfg in (

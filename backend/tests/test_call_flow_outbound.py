@@ -160,3 +160,28 @@ async def test_sip_contact_dials_direct(client, rt, ari):
     await settle(rt, timeout=5)
     assert ari.originated_endpoints() == ["PJSIP/sip:uncle@example.org"]
     assert (await calls(client))[0]["outcome"] == "time_cap"
+
+
+async def test_memory_key_dials_contact(client, rt, ari, grandma):
+    """Pressing M1 (dialplan extension "m1") reaches the contact bound to that key."""
+    await client.patch(f"/api/contacts/{grandma['id']}", json={"memory_key": "m1"})
+    phone = ari.dial("m1")
+    for _ in range(100):
+        await asyncio.sleep(0.01)
+        if ari.bridge_recordings():
+            break
+    assert ari.originated_endpoints() == ["PJSIP/+15555550123@trunk"]
+    ari.hangup_channel(phone)
+    await settle(rt)
+    (call,) = await calls(client)
+    assert call["outcome"] == "completed" and call["contact_id"] == grandma["id"]
+
+
+async def test_unbound_memory_key_is_friendly(client, rt, ari):
+    """SOS with nothing bound: the toddler hears the "nothing there" prompt, never silence."""
+    phone = ari.dial("sos")
+    await settle(rt)
+    assert "Nothing is on that button. Try another one!" in rt.tts.rendered
+    assert phone in ari.hangups or phone not in ari.channels
+    (call,) = await calls(client)
+    assert call["outcome"] == "rejected_unknown"
