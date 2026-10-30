@@ -48,11 +48,31 @@ Kinds: `speed_dial` (implicit, from contacts), `weather`, `fun_fact`, `secret_me
   "unknown_caller_policy": "reject" ,
   "notifications": {"ntfy_topic": null, "email": null},
   "trunk_caller_id": "+15555550100",
-  "weather_location": {"lat": 30.27, "lon": -97.74, "name": "home"}
+  "weather_location": {"lat": 30.27, "lon": -97.74, "name": "home"},
+  "ringtone": "classic",
+  "ringer_volume": 80
 }
 ```
-`unknown_caller_policy`: `reject` | `voicemail`.
+`unknown_caller_policy`: `reject` | `voicemail`. `ringtone` is a name from `GET /api/ringtones`
+(422 `unknown_ringtone` otherwise); `ringer_volume` is 0-100.
 - `GET /api/settings`, `PATCH /api/settings`
+
+## Ringtones
+
+What the base speaker plays for an incoming call. Built-ins ship with the backend (`classic`,
+`chime`, `birds`); parents can upload more. Every file is one 2 s "ring on" burst, 16 kHz
+16-bit mono; the ringer applies the 2 s on / 4 s off cadence and `ringer_volume`.
+
+`Ringtone`: `{"name": "classic", "builtin": true, "duration_seconds": 2.0, "audio_url": "/api/ringtones/classic/audio"}`
+- `GET /api/ringtones` → `Ringtone[]`, built-ins first
+- `POST /api/ringtones` multipart form, field `file`: a WAV (16-bit PCM, any rate/channels, ≤ 2 MB,
+  ≤ 10 s). It is converted to 16 kHz mono and stored under `<data>/ringtones/`. The name is the
+  file name slugged to `[a-z0-9_-]{1,32}`. → 201 `Ringtone`. Uploading the same name again
+  overwrites it. Errors: 400 `invalid_wav` | `bad_name`, 409 `ringtone_builtin`, 413 `too_large`,
+  422 `too_long`.
+- `DELETE /api/ringtones/{name}` → 204. Uploads only (409 `ringtone_builtin`). If it was the
+  active `settings.ringtone`, the setting goes back to `classic`.
+- `GET /api/ringtones/{name}/audio` → `audio/wav` (supports Range), for previewing in the parent app
 
 ## Calls and recordings
 

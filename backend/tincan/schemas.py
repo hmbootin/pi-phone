@@ -155,6 +155,16 @@ class Settings(BaseModel):
     notifications: Notifications = Field(default_factory=Notifications)
     trunk_caller_id: str | None = "+15555550100"
     weather_location: WeatherLocation = Field(default_factory=WeatherLocation)
+    # A built-in name (classic, chime, birds) or an uploaded one; see tincan/sounds.
+    ringtone: str = Field(default="classic", pattern=r"^[a-z0-9_-]{1,32}$")
+    ringer_volume: int = Field(default=80, ge=0, le=100)
+
+
+class RingtoneOut(BaseModel):
+    name: str
+    builtin: bool
+    duration_seconds: float
+    audio_url: str
 
 
 class CallOut(BaseModel):
