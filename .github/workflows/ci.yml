@@ -75,7 +75,8 @@ jobs:
       - name: shellcheck + hadolint
         run: |
           shellcheck -S warning asterisk/entrypoint.sh deploy/*.sh
-          hadolint asterisk/Dockerfile
+          # DL3006: the base image tag comes from ARG DEBIAN_IMAGE (pinned there); hadolint can't see it.
+          hadolint --ignore DL3006 asterisk/Dockerfile
           test -f backend/Dockerfile && hadolint --ignore DL3008 backend/Dockerfile || true
       - name: every ${VAR} in a template is a documented one
         # The allowed list must match TEMPLATE_VARS in asterisk/entrypoint.sh and the
