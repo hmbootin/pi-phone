@@ -47,6 +47,20 @@ mise run dev          # backend on :8080 with a fake Asterisk, ui on :5173
 See [deploy/README.md](deploy/README.md). Short version: flash Raspberry Pi OS Lite 64-bit, run
 `deploy/bootstrap.sh` once, then every later update is `mise run release` from your laptop.
 
+## Demo without hardware
+
+`mise run demo` starts the backend against an in-process fake Asterisk, serves the built parent app
+on http://localhost:8080 (password `demo`), and drives a scripted day: a fun fact, a call to Grandma
+with a recording, a do-not-disturb rejection, an inbound call that hits the time cap, an unknown
+caller turned away, and a secret message for Mom.
+
+<p>
+<img src="docs/images/home.png" width="200" alt="Home: line status and today's calls">
+<img src="docs/images/dial.png" width="200" alt="Dial pad: what each digit does">
+<img src="docs/images/contacts.png" width="200" alt="Contacts with do-not-disturb">
+<img src="docs/images/memories.png" width="200" alt="Memories: recordings to listen to">
+</p>
+
 ## Status
 
 Experimental branch `tin-can-landline`. Nothing here has touched real hardware yet beyond the Pico

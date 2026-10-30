@@ -7,6 +7,7 @@ Each milestone ends with something the toddler can hold.
 - [x] Backend with fake ARI, policies, features, parent API, tests
 - [x] Parent UI
 - [x] Asterisk config, Compose, bootstrap, CI
+- [x] `mise run demo` end-to-end against the fake Asterisk
 - [ ] Order hardware (`hardware/bom.md`)
 
 ## M1 Dial tone
