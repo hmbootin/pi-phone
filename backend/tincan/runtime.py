@@ -13,6 +13,8 @@ from tincan.config import Config
 from tincan.db import Database
 from tincan.events import Broadcaster
 from tincan.features import FEATURES
+from tincan.hardware.machine import PhoneStateMachine
+from tincan.hardware.sounds import SoundSet
 from tincan.notify import Notifier
 from tincan.schemas import CallOut, Settings
 from tincan.tts.piper import Tts
@@ -43,18 +45,58 @@ class Runtime:
                 config.ari_url, config.ari_user, config.ari_password, config.ari_app
             )
         self.router = CallRouter(self)
+        self.phone: PhoneStateMachine | None = self._build_phone()
         self._started = False
+
+    def _build_phone(self) -> PhoneStateMachine | None:
+        """The phone-side state machine over real or fake hardware, or None when no phone."""
+        config = self.config
+        if config.tincan_hardware == "none":
+            return None
+        if config.tincan_hardware == "fake":
+            from tincan.hardware.fake import FakeAudio, FakeInputs, FakePhone
+
+            inputs: Any = FakeInputs()
+            audio: Any = FakeAudio()
+            phone: Any = FakePhone(ari=self.fake)
+            log.warning("TINCAN_HARDWARE=fake: using in-process keypad/hook/audio/baresip")
+        else:
+            from tincan.hardware import pinmap
+            from tincan.hardware.alsa import AlsaAudio
+            from tincan.hardware.baresip import BaresipClient
+            from tincan.hardware.gpio import GpioInputs
+
+            inputs = GpioInputs(pinmap.load(config.tincan_pinmap or pinmap.DEFAULT_PATH))
+            audio = AlsaAudio(
+                config.handset_audio_device, config.ringer_audio_device, config.ringer_mixer
+            )
+            phone = BaresipClient(config.phone_ctrl_host, config.phone_ctrl_port)
+        return PhoneStateMachine(
+            inputs,
+            audio,
+            phone,
+            SoundSet.default(),
+            sip_host=config.asterisk_sip_host,
+            publish=self.events.publish,
+            ringer_volume=lambda: getattr(self.settings(), "ringer_volume", 80),
+        )
 
     async def start(self) -> None:
         if self._started:
             return
         self._started = True
         await self.router.start()
+        if self.phone is not None:
+            await self.phone.start()
 
     async def stop(self) -> None:
         if not self._started:
             return
         self._started = False
+        if self.phone is not None:
+            await self.phone.stop()
+            for part in (self.phone.inputs, self.phone.audio, self.phone.phone):
+                await part.close()
         await self.router.stop()
         await self.ari.close()
 

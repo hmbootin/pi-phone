@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 
 from tincan import __version__, backup, store
 from tincan.api.deps import ApiError, runtime
-from tincan.schemas import BackupReportIn, BackupStatus, SystemStatus, TestCallIn
+from tincan.schemas import BackupReportIn, BackupStatus, PhoneStatus, SystemStatus, TestCallIn
 
 router = APIRouter(prefix="/api", tags=["system"])
 
@@ -39,6 +39,23 @@ async def status(request: Request) -> SystemStatus:
         version=rt.config.tincan_version if rt.config.tincan_version != "dev" else __version__,
         disk_free_bytes=usage.free,
         backup=BackupStatus(last_ok_at=backup.last_ok(rt.db), pending=len(backup.pending(rt.db))),
+    )
+
+
+@router.get("/system/phone")
+async def phone_status(request: Request) -> PhoneStatus:
+    """The phone-side state machine (keys, hook, baresip). `attached` is false with no hardware."""
+    rt = runtime(request)
+    m = rt.phone
+    if m is None:
+        return PhoneStatus(attached=False, hardware=rt.config.tincan_hardware)
+    return PhoneStatus(
+        attached=True,
+        hardware=rt.config.tincan_hardware,
+        state=m.state.value,
+        off_hook=m.off_hook,
+        dialed=m.dialed,
+        sip="connected" if m.phone.connected else "disconnected",
     )
 
 

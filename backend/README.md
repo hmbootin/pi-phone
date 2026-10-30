@@ -42,6 +42,12 @@ CLI: `tincan serve | seed-demo | render-prompts | backup-done <id>...`.
 | `TINCAN_SECRET_KEY` | generated into `$TINCAN_DATA_DIR/secret_key` | Signs the session cookie |
 | `TINCAN_UI_DIR` | unset (`/app/ui` in Docker) | Built parent app; served at `/` with SPA fallback when the dir exists |
 | `TINCAN_FAKE_ARI` | `0` | `1` runs the in-process fake Asterisk and mounts `/api/dev/simulate` |
+| `TINCAN_HARDWARE` | `none` | `gpio` on the Pi (keypad/hook via gpiozero, tones via `aplay`, baresip via ctrl_tcp); `fake` for the demo and tests; `none` = no phone attached |
+| `TINCAN_PINMAP` | `<repo>/hardware/pinmap.toml` | GPIO map for rows, columns, hook and keys |
+| `PHONE_CTRL_HOST` / `PHONE_CTRL_PORT` | `127.0.0.1` / `4444` | baresip `ctrl_tcp` in the `phone` service (`host.docker.internal` from the container) |
+| `ASTERISK_SIP_HOST` | `127.0.0.1` | Host part of the URI baresip dials (`sip:m1@<host>`) |
+| `HANDSET_AUDIO_DEVICE` / `RINGER_AUDIO_DEVICE` | `plughw:1,0` / `plughw:0,0` | ALSA devices for handset tones (USB adapter) and the ringer (Pi jack) |
+| `RINGER_MIXER` | unset | `amixer` control for ringer volume (e.g. `PCM`); unset leaves the mixer alone |
 | `TINCAN_TIME_SCALE` | `1.0` | Multiplies call timers; tests use 0.01. Never set in production |
 | `TINCAN_VERSION` | `dev` | Reported by `/api/system/status` (CI sets it to the tag) |
 | `ARI_URL` | `http://localhost:8088` | Asterisk HTTP/ARI base URL (`http://asterisk:8088` in Compose) |

@@ -16,6 +16,10 @@ dependencies = [
     "python-multipart>=0.0.9",
 ]
 
+[project.optional-dependencies]
+# Only on the Pi: the keypad/hook scanner (tincan.hardware.gpio). Laptops and CI never need it.
+pi = ["gpiozero>=2.0"]
+
 [project.scripts]
 tincan = "tincan.cli:main"
 

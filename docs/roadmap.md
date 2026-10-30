@@ -18,6 +18,8 @@ Each milestone ends with something the toddler can hold.
 - Base speaker on the amp plays a ringtone from the Pi's headphone jack.
 
 ## M2 Dial tone
+- [x] Backend hardware service: key/hook scanner, tone player, baresip client, state machine, all
+      behind fakes (`mise run demo` lifts the handset and presses M1).
 - `phone` service (baresip) and the backend hardware service in Compose; `pjsip show endpoints`
   shows `phone`; lifting the handset gives dial tone.
 - Press `7` → hear a fun fact. Proves keys → backend → baresip → Asterisk → backend → Piper → playback.
