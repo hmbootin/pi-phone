@@ -81,3 +81,38 @@ values (`external_media_address =` with nothing after it is valid for PJSIP).
 - Audio: ALSA on the USB adapter (`plughw:1,0`), ulaw only, 8 kHz. DTMF as RFC2833.
 - Auto-answer off; the backend answers when the hook switch lifts, via baresip's `ctrl_tcp`.
 - Check with `asterisk -rx "pjsip show endpoints"`: `phone` must show `Avail`.
+
+## Building the Asterisk image locally
+
+The image compiles Asterisk (and its bundled pjproject) from source, so the first build is slow;
+rebuilds with an unchanged `Dockerfile` are cached. On an Apple Silicon Mac `docker build` is a
+native linux/arm64 build, the same architecture as the Pi. From the repo root:
+
+```
+docker build -t tincan-asterisk:ci-test asterisk
+asterisk/smoke-test.sh tincan-asterisk:ci-test
+```
+
+`smoke-test.sh` starts the image with the minimum env (`ARI_USER`, `ARI_PASSWORD`,
+`PHONE_SIP_PASSWORD`, `TRUNK_PROVIDER=none`), waits for the healthcheck, checks that every
+`load =>` in `modules.conf` exists in the image and loaded, that the `phone` endpoint and the
+`from-phone` -> `Stasis(tincan,...)` dialplan are there, and that ARI answers on
+`127.0.0.1:8088`. It removes the container when done. The same script runs in
+`.github/workflows/asterisk-image.yml` on GitHub's native arm64 runner.
+
+To poke at a running container by hand:
+
+```
+docker run -d --name ast -p 127.0.0.1:8088:8088 \
+-e ARI_USER=smoke -e ARI_PASSWORD=smoke-pass -e PHONE_SIP_PASSWORD=smoke-sip -e TRUNK_PROVIDER=none \
+tincan-asterisk:ci-test
+docker exec ast asterisk -rx "module show like pjsip"
+docker exec ast asterisk -rx "pjsip show endpoints"
+docker exec ast asterisk -rx "dialplan show from-phone"
+curl -u smoke:smoke-pass http://127.0.0.1:8088/ari/asterisk/info
+docker rm -f ast
+```
+
+Adding a module: it must appear in both the `menuselect --enable` list in `asterisk/Dockerfile`
+(menuselect fails the build on a name that does not exist in the pinned version) and in
+`modules.conf`; the smoke test fails if `modules.conf` loads something the image does not have.

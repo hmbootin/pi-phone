@@ -67,7 +67,7 @@ jobs:
       - run: sudo apt-get update -q && sudo apt-get install -y -q gettext-base shellcheck hadolint
       - name: shellcheck + hadolint
         run: |
-          shellcheck -S warning asterisk/entrypoint.sh deploy/*.sh
+          shellcheck -S warning asterisk/entrypoint.sh asterisk/smoke-test.sh deploy/*.sh
           hadolint asterisk/Dockerfile
           test -f backend/Dockerfile && hadolint --ignore DL3008 backend/Dockerfile || true
       - name: every ${VAR} in a template is a documented one

@@ -70,6 +70,11 @@ journalctl -u tincan-update -n 50             # what the timer has been doing
 The GHCR packages must be **public** (or the Pi needs `docker login ghcr.io`): GitHub → the
 package → Package settings → Change visibility. Do this once after the first release.
 
+The Asterisk image is also built and smoke-tested, natively on arm64, by
+`.github/workflows/asterisk-image.yml` on every change under `asterisk/` and weekly, so a release
+never discovers a broken Dockerfile. To build and test it on a laptop, see
+"Building the Asterisk image locally" in [asterisk/etc/README.md](../asterisk/etc/README.md).
+
 ## 4. Developing against the Pi
 
 See [docs/remote-dev.md](../docs/remote-dev.md). Short version: `mise run deploy-dev` syncs your

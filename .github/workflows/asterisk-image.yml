@@ -1,0 +1,74 @@
+name: Asterisk image
+
+# Builds asterisk/Dockerfile for linux/arm64 (the Pi) natively on GitHub's hosted arm64 runner
+# (free for public repos; no QEMU) and smoke-tests the result with asterisk/smoke-test.sh, so a
+# broken Dockerfile, a bad menuselect module name, or a vanished upstream tarball shows up here
+# instead of on the Pi. Nothing is pushed: release.yml owns the GHCR images.
+#
+# The first build compiles Asterisk + bundled pjproject from source (~10-30 min on the runner).
+# Repeat builds of an unchanged Dockerfile hit the GitHub Actions cache (type=gha) and take
+# about a minute. The weekly run deliberately bypasses the cache so the upstream download is
+# re-exercised; if downloads.asterisk.org retires the pinned version, that run fails.
+
+on:
+  pull_request:
+    paths:
+      - "asterisk/**"
+      - ".github/workflows/asterisk-image.yml"
+  push:
+    branches: [main, tin-can-landline]
+    paths:
+      - "asterisk/**"
+      - ".github/workflows/asterisk-image.yml"
+  workflow_dispatch:
+  schedule:
+    # Monday 06:17 UTC. Odd minute to avoid the top-of-hour crowd.
+    - cron: "17 6 * * 1"
+
+concurrency:
+  group: asterisk-image-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build + smoke test (linux/arm64, native)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: build linux/arm64 image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: asterisk
+          file: asterisk/Dockerfile
+          platforms: linux/arm64
+          push: false
+          load: true
+          tags: tincan-asterisk:ci-test
+          # Scheduled runs skip the cache on purpose: the point of the weekly build is to notice
+          # when the upstream tarball or an apt package disappears, and a cached layer would hide it.
+          no-cache: ${{ github.event_name == 'schedule' }}
+          cache-from: type=gha,scope=asterisk-arm64
+          cache-to: type=gha,scope=asterisk-arm64,mode=max
+
+      - name: image summary
+        run: |
+          docker image inspect tincan-asterisk:ci-test --format 'size: {{.Size}} bytes, arch: {{.Os}}/{{.Architecture}}'
+          docker run --rm --entrypoint asterisk tincan-asterisk:ci-test -V
+          {
+            echo "## tincan-asterisk (linux/arm64)"
+            echo
+            echo "- version: \`$(docker run --rm --entrypoint asterisk tincan-asterisk:ci-test -V)\`"
+            echo "- size: $(docker image inspect tincan-asterisk:ci-test --format '{{.Size}}' | awk '{printf "%.0f MB", $1/1024/1024}')"
+            echo "- modules: $(docker run --rm --entrypoint sh tincan-asterisk:ci-test -c 'ls /usr/lib/asterisk/modules | wc -l')"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: smoke test (entrypoint, chan_pjsip, phone endpoint, dialplan, ARI)
+        run: asterisk/smoke-test.sh tincan-asterisk:ci-test
