@@ -21,3 +21,10 @@ services:
     environment:
       TINCAN_VERSION: dev
       TINCAN_LOG_LEVEL: DEBUG
+
+  phone:
+    image: tincan-phone:dev
+    build:
+      context: ../phone
+      dockerfile: Dockerfile
+    pull_policy: never

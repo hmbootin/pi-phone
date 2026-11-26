@@ -1,0 +1,13 @@
+#
+# baresip accounts for the Tin Can phone service. Rendered by entrypoint.sh with envsubst
+# (variables: ASTERISK_HOST, PHONE_SIP_PASSWORD). One account: user "phone" at the Asterisk
+# container, matching [phone] / [phone-auth] in asterisk/etc/pjsip.conf.tmpl.
+#
+#  auth_pass      the shared PHONE_SIP_PASSWORD (hex from openssl rand; must not contain ; or >)
+#  audio_codecs   G.711 only, same order as pjsip.conf allows
+#  regint=60      re-REGISTER every minute so a password rotation or Asterisk restart heals fast
+#  answermode     manual: nothing is answered until the backend sends "accept"
+#  dtmfmode       rtpevent (RFC 4733) matches dtmf_mode = rfc4733 on the Asterisk endpoint
+#  no outbound=   register straight to the domain; no proxy, no NAT helpers on loopback
+#
+"Tin Can" <sip:phone@${ASTERISK_HOST}>;auth_user=phone;auth_pass=${PHONE_SIP_PASSWORD};audio_codecs=PCMU,PCMA;regint=60;answermode=manual;dtmfmode=rtpevent;mwi=no;call_transfer=no;ptime=20

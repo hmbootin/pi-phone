@@ -2,7 +2,7 @@
 # Images are built by .github/workflows/release.yml and pulled here; deploy/compose.dev.yaml is
 # the override that builds from a checked-out repo instead.
 #
-# Required .env (see .env.example): GHCR_OWNER, TINCAN_VERSION, ARI_*, PHONE_SIP_PASSWORD,
+# Required .env (see .env.example): GHCR_OWNER, TINCAN_VERSION, ARI_*, PHONE_SIP_PASSWORD, PHONE_AUDIO_DEVICE,
 # TRUNK_*, TINCAN_PARENT_PASSWORD, TINCAN_SECRET_KEY.
 
 name: tincan
@@ -45,6 +45,50 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "5" }
 
+  # The phone: baresip wrapping the handset's USB audio adapter. Registers to Asterisk as PJSIP
+  # endpoint "phone" and takes dial/accept/hangup from the backend over ctrl_tcp (phone/README.md).
+  phone:
+    image: ghcr.io/${GHCR_OWNER}/tincan-phone:${TINCAN_VERSION:-stable}
+    container_name: tincan-phone
+    # host networking for the same reason as asterisk: SDP carries the address RTP must reach,
+    # and loopback to Asterisk is the simplest correct answer. baresip listens on 0.0.0.0:5062
+    # (Asterisk owns 5060) and RTP 20000-20100/udp. ctrl_tcp listens on PHONE_CTRL_BIND:4444;
+    # 0.0.0.0 because the backend is on the bridge network and reaches it through
+    # host.docker.internal. That port has no authentication, so with host networking any LAN
+    # host that can reach the Pi can also tell the phone to dial. Acceptable on a home LAN
+    # behind a router; if that ever changes, move the backend to host networking too and set
+    # PHONE_CTRL_BIND=127.0.0.1.
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      asterisk:
+        condition: service_healthy
+    devices:
+      - /dev/snd
+    # baresip runs as uid 2001 inside; /dev/snd on Raspberry Pi OS is root:audio (gid 29).
+    # The name is resolved from the image's /etc/group, where audio is 29 as well.
+    group_add:
+      - audio
+    environment:
+      PHONE_SIP_PASSWORD: ${PHONE_SIP_PASSWORD}
+      ASTERISK_HOST: 127.0.0.1
+      PHONE_AUDIO_MODULE: ${PHONE_AUDIO_MODULE:-alsa}
+      PHONE_AUDIO_DEVICE: ${PHONE_AUDIO_DEVICE:-plughw:1,0}
+      PHONE_CTRL_BIND: ${PHONE_CTRL_BIND:-0.0.0.0}
+      PHONE_CTRL_PORT: "4444"
+    # phone/Dockerfile declares the same HEALTHCHECK (ctrl_tcp port in LISTEN, read from
+    # /proc/net/tcp; it must not connect because ctrl_tcp drops its single client on a new
+    # connection). Repeated here so compose timings are visible next to the other services.
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
   backend:
     image: ghcr.io/${GHCR_OWNER}/tincan-backend:${TINCAN_VERSION:-stable}
     container_name: tincan-backend
@@ -62,6 +106,9 @@ services:
       ARI_USER: ${ARI_USER}
       ARI_PASSWORD: ${ARI_PASSWORD}
       ARI_APP: tincan
+      # baresip's ctrl_tcp in the phone service (host networking), same hop as ARI.
+      PHONE_CTRL_HOST: host.docker.internal
+      PHONE_CTRL_PORT: "4444"
       TINCAN_PARENT_PASSWORD: ${TINCAN_PARENT_PASSWORD}
       TINCAN_SECRET_KEY: ${TINCAN_SECRET_KEY}
       TINCAN_UI_DIR: /app/ui

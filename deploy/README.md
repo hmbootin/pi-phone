@@ -6,7 +6,7 @@ copied to `/opt/tincan` by `bootstrap.sh`; nothing else lives on the host.
 | File | Purpose |
 |------|---------|
 | `bootstrap.sh` | One-time Pi setup: Docker, Tailscale, `/data`, `/opt/tincan`, systemd units. Idempotent. |
-| `compose.yaml` | The three services: `asterisk`, `backend`, `backup` (profile, run by the timer). |
+| `compose.yaml` | The four services: `asterisk`, `phone` (baresip), `backend`, `backup` (profile, run by the timer). |
 | `compose.dev.yaml` | Override that builds images on the Pi from a synced checkout (`mise run deploy-dev`). |
 | `.env.example` | Every setting, documented. Becomes `/opt/tincan/.env`. |
 | `rclone.conf.example` | Backblaze B2 + `crypt` remote for off-site backups. Becomes `/opt/tincan/rclone.conf`. |
