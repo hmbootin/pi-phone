@@ -64,11 +64,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update -q && sudo apt-get install -y -q gettext-base shellcheck hadolint
+      - run: sudo apt-get update -q && sudo apt-get install -y -q gettext-base shellcheck
+      # hadolint is not an apt package; pin the upstream static binary.
+      - name: install hadolint
+        run: |
+          sudo curl -fsSL -o /usr/local/bin/hadolint \
+            https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64
+          sudo chmod +x /usr/local/bin/hadolint
+          hadolint --version
       - name: shellcheck + hadolint
         run: |
           shellcheck -S warning asterisk/entrypoint.sh deploy/*.sh
-          hadolint asterisk/Dockerfile
+          # DL3006: the base image tag comes from ARG DEBIAN_IMAGE (pinned there); hadolint can't see it.
+          hadolint --ignore DL3006 asterisk/Dockerfile
           test -f backend/Dockerfile && hadolint --ignore DL3008 backend/Dockerfile || true
       - name: every ${VAR} in a template is a documented one
         # The allowed list must match TEMPLATE_VARS in asterisk/entrypoint.sh and the
