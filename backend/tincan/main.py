@@ -12,7 +12,17 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from itsdangerous import URLSafeTimedSerializer
 
-from tincan.api import auth, calls, contacts, dev, features, recordings, settings, system
+from tincan.api import (
+    auth,
+    calls,
+    contacts,
+    dev,
+    features,
+    recordings,
+    ringtones,
+    settings,
+    system,
+)
 from tincan.api.deps import COOKIE, PUBLIC_PATHS, ApiError, error_response, session_valid
 from tincan.config import Config
 from tincan.runtime import Runtime
@@ -70,7 +80,7 @@ def create_app(config: Config | None = None) -> FastAPI:
     async def healthz() -> dict:
         return {"ok": True}
 
-    for r in (auth, contacts, features, settings, calls, recordings, system):
+    for r in (auth, contacts, features, settings, calls, recordings, ringtones, system):
         app.include_router(r.router)
     if config.tincan_fake_ari:
         app.include_router(dev.router)
